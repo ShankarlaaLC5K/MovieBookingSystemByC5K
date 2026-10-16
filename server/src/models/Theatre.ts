@@ -1,4 +1,5 @@
-import mongoose, { Document, Schema } from "mongoose";
+
+import { Document, Schema, model } from "mongoose";
 
 export interface ITheatre extends Document {
   name: string;
@@ -6,7 +7,6 @@ export interface ITheatre extends Document {
   city: string;
   state: string;
   pincode?: string;
-  owner?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,9 +18,8 @@ const theatreSchema = new Schema<ITheatre>(
     city: { type: String, required: true, trim: true },
     state: { type: String, required: true, trim: true },
     pincode: { type: String, trim: true },
-    owner: { type: Schema.Types.ObjectId, ref: "User", index: true }
   },
   { timestamps: true }
 );
 
-export const Theatre = mongoose.model<ITheatre>("Theatre", theatreSchema);
+export const Theatre = model<ITheatre>("Theatre", theatreSchema);

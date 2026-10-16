@@ -1,11 +1,43 @@
 import { Router } from "express";
-import { createTheatre, getTheatres, getTheatre, updateTheatre, deleteTheatre } from "../controllers/theatreController";
+import {
+  createTheatre,
+  getTheatres,
+  getTheatre,
+  updateTheatre,
+  deleteTheatre,
+} from "../controllers/theatreController";
 import { protect } from "../middleware/authMiddleware";
-import { requireAdmin, requireTheatreManager, requireOwnedResource } from "../middleware/rolemiddleware";
+import {
+  requireTheatreManager,
+  requireOwnedResource,
+} from "../middleware/rolemiddleware";
+
 const router = Router();
+
 router.get("/", getTheatres);
 router.get("/:id", getTheatre);
-router.post("/", protect, requireTheatreManager, createTheatre);
-router.put("/:id", protect, requireTheatreManager, requireOwnedResource, updateTheatre);
-router.delete("/:id", protect, requireTheatreManager, requireOwnedResource, deleteTheatre);
+
+router.post(
+  "/",
+  protect,
+  requireTheatreManager,
+  createTheatre
+);
+
+router.put(
+  "/:id",
+  protect,
+  requireTheatreManager,
+  requireOwnedResource,
+  updateTheatre
+);
+
+router.delete(
+  "/:id",
+  protect,
+  requireTheatreManager,
+  requireOwnedResource,
+  deleteTheatre
+);
+
 export default router;

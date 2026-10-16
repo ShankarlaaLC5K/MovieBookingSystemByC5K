@@ -1,4 +1,7 @@
-export type UserRole = "user" | "theatreOwner" | "admin";
+
+export type UserRole = "user" | "admin";
+
+export type RegistrationRole = "user" ;
 
 export interface User {
   id: string;
@@ -16,6 +19,7 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
+  role: RegistrationRole;
 }
 
 export interface AuthResponse {

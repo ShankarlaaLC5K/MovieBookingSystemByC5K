@@ -53,7 +53,7 @@ function ProtectedRoute({
     );
   }
 
-  if (managerOnly && user.role !== "admin" && user.role !== "theatreOwner") {
+  if (managerOnly && user.role !== "admin" ) {
     return <Navigate to="/" replace />;
   }
 

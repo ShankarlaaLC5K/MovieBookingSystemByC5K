@@ -87,13 +87,13 @@ function Navbar() {
                   Profile
                 </Link>
 
-                {(user.role === "admin" || user.role === "theatreOwner") && (
-                  <Link
-                    to={user.role === "admin" ? "/admin" : "/owner"}
-                    className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-                  >
-                    {user.role === "admin" ? "Superadmin" : "Owner Dashboard"}
-                  </Link>
+                {user.role === "admin" && (
+                <Link
+                  to="/admin"
+                  className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+                >
+                  Admin
+                </Link>
                 )}
 
                 <span className="text-sm text-slate-600 dark:text-slate-400">
@@ -257,14 +257,14 @@ function Navbar() {
                     Profile
                   </Link>
 
-                  {(user.role === "admin" || user.role === "theatreOwner") && (
-                    <Link
-                      to={user.role === "admin" ? "/admin" : "/owner"}
-                      onClick={closeMobileMenu}
-                      className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
-                    >
-                      {user.role === "admin" ? "Superadmin" : "Owner Dashboard"}
-                    </Link>
+                  {user.role === "admin" && (
+                  <Link
+                    to="/admin"
+                    onClick={closeMobileMenu}
+                    className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+                  >
+                    Admin
+                  </Link>
                   )}
 
                   <div className="border-t border-slate-200 pt-3 dark:border-slate-800">

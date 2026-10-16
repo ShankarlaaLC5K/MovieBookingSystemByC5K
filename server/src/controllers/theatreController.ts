@@ -1,21 +1,15 @@
+
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Theatre } from "../models/Theatre";
 import { AuthRequest } from "../middleware/authMiddleware";
-import { User } from "../models/User";
 
 export async function createTheatre(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
   try {
-    const {
-      name,
-      address,
-      city,
-      state,
-      pincode,
-    } = req.body;
+    const { name, address, city, state, pincode } = req.body;
 
     if (!name || !address || !city || !state) {
       res.status(400).json({
@@ -25,9 +19,7 @@ export async function createTheatre(
       return;
     }
 
-    const actor = req.userId ? await User.findById(req.userId).select("role") : null;
     const theatre = await Theatre.create({
-      owner: actor?.role === "theatreOwner" ? req.userId : undefined,
       name: String(name).trim(),
       address: String(address).trim(),
       city: String(city).trim(),
@@ -55,9 +47,7 @@ export async function getTheatres(
   res: Response
 ): Promise<void> {
   try {
-    const actor = req.userId ? await User.findById(req.userId).select("role") : null;
-    const filter = actor?.role === "theatreOwner" ? { owner: req.userId } : {};
-    const theatres = await Theatre.find(filter).sort({ createdAt: -1 });
+    const theatres = await Theatre.find({}).sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -79,7 +69,7 @@ export async function getTheatre(
   res: Response
 ): Promise<void> {
   try {
-const id = String(req.params.id);
+    const id = String(req.params.id);
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({
@@ -118,7 +108,7 @@ export async function updateTheatre(
   res: Response
 ): Promise<void> {
   try {
-const id = String(req.params.id);
+    const id = String(req.params.id);
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({
@@ -128,10 +118,6 @@ const id = String(req.params.id);
       return;
     }
 
-    const actor = req.userId ? await User.findById(req.userId).select("role") : null;
-    const existingTheatre = await Theatre.findById(id);
-    if (!existingTheatre) { res.status(404).json({ success: false, message: "Theatre not found" }); return; }
-    if (actor?.role === "theatreOwner" && existingTheatre.owner?.toString() !== req.userId) { res.status(403).json({ success: false, message: "You can only manage your own theatre" }); return; }
     const {
       name,
       address,
@@ -199,7 +185,7 @@ export async function deleteTheatre(
   res: Response
 ): Promise<void> {
   try {
-  const id = String(req.params.id);
+    const id = String(req.params.id);
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({
@@ -209,10 +195,6 @@ export async function deleteTheatre(
       return;
     }
 
-    const actor = req.userId ? await User.findById(req.userId).select("role") : null;
-    const existingTheatre = await Theatre.findById(id);
-    if (!existingTheatre) { res.status(404).json({ success: false, message: "Theatre not found" }); return; }
-    if (actor?.role === "theatreOwner" && existingTheatre.owner?.toString() !== req.userId) { res.status(403).json({ success: false, message: "You can only manage your own theatre" }); return; }
     const theatre = await Theatre.findByIdAndDelete(id);
 
     if (!theatre) {

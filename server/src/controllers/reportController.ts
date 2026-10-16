@@ -1,8 +1,6 @@
-
 import { Response } from "express";
 import { Booking } from "../models/Booking";
 import { Show } from "../models/Show";
-import { Theatre } from "../models/Theatre";
 import { User } from "../models/User";
 import { AuthRequest } from "../middleware/authMiddleware";
 
@@ -29,10 +27,7 @@ export const getReports = async (
       return;
     }
 
-    if (
-      currentUser.role !== "admin" &&
-      currentUser.role !== "theatreOwner"
-    ) {
+    if (currentUser.role !== "admin") {
       res.status(403).json({
         success: false,
         message: "Reports access denied",
@@ -40,34 +35,8 @@ export const getReports = async (
       return;
     }
 
-    let bookingFilter: Record<string, unknown> = {};
-    let showFilter: Record<string, unknown> = {};
-
-    if (currentUser.role === "theatreOwner") {
-      const ownedTheatres = await Theatre.find({
-        owner: req.userId,
-      }).select("_id");
-
-      const ownedTheatreIds = ownedTheatres.map(
-        (theatre) => theatre._id
-      );
-
-      const ownedShows = await Show.find({
-        theatre: { $in: ownedTheatreIds },
-      }).select("_id");
-
-      const ownedShowIds = ownedShows.map(
-        (show) => show._id
-      );
-
-      bookingFilter = {
-        show: { $in: ownedShowIds },
-      };
-
-      showFilter = {
-        theatre: { $in: ownedTheatreIds },
-      };
-    }
+    const bookingFilter: Record<string, unknown> = {};
+    const showFilter: Record<string, unknown> = {};
 
     const [
       totalBookings,
@@ -205,10 +174,7 @@ export const getReports = async (
               $sum: {
                 $cond: [
                   {
-                    $eq: [
-                      "$showSeats.status",
-                      "booked",
-                    ],
+                    $eq: ["$showSeats.status", "booked"],
                   },
                   1,
                   0,

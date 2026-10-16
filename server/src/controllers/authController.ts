@@ -9,7 +9,7 @@ export async function register(
   res: Response
 ): Promise<void> {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
       res.status(400).json({
@@ -19,15 +19,73 @@ export async function register(
       return;
     }
 
-    if (password.length < 6) {
+    if (typeof name !== "string" || name.trim().length < 2) {
       res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters",
+        message: "Name must be at least 2 characters",
+      });
+      return;
+    }
+
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid email or password",
       });
       return;
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+      return;
+    }
+
+    const passwordErrors: string[] = [];
+
+    if (password.length < 8) {
+      passwordErrors.push("Minimum 8 characters");
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      passwordErrors.push("At least one capital letter (A-Z)");
+    }
+
+    if (!/[a-z]/.test(password)) {
+      passwordErrors.push("At least one small letter (a-z)");
+    }
+
+    if (!/[0-9]/.test(password)) {
+      passwordErrors.push("At least one number (0-9)");
+    }
+
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      passwordErrors.push("At least one special character");
+    }
+
+    if (passwordErrors.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: "Password does not meet all requirements",
+        errors: passwordErrors,
+      });
+      return;
+    }
+
+    if (role !== undefined && role !== "user") {
+    res.status(400).json({
+    success: false,
+    message: "Only user registration is allowed",
+    });
+    return;
+    }
 
     const existingUser = await User.findOne({
       email: normalizedEmail,
@@ -47,7 +105,8 @@ export async function register(
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
-    });
+      role: "user",
+      });
 
     const token = generateToken(user._id.toString());
 
@@ -56,7 +115,7 @@ export async function register(
       message: "Registration successful",
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -76,11 +135,15 @@ export async function login(
   req: Request,
   res: Response
 ): Promise<void> {
-
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      !email.trim() ||
+      !password
+    ) {
       res.status(400).json({
         success: false,
         message: "Email and password are required",
@@ -122,7 +185,7 @@ export async function login(
       message: "Login successful",
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -167,35 +230,80 @@ export async function getMe(
   }
 }
 
-
-export async function listUsersForAdmin(_req: AuthRequest, res: Response): Promise<void> {
+export async function listUsersForAdmin(
+  _req: AuthRequest,
+  res: Response
+): Promise<void> {
   try {
-    const users = await User.find().select("name email role createdAt").sort({ createdAt: -1 });
-    res.json({ success: true, users });
+    const users = await User.find()
+      .select("name email role createdAt")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      users,
+    });
   } catch {
-    res.status(500).json({ success: false, message: "Failed to list users" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to list users",
+    });
   }
 }
 
-export async function updateUserRole(req: AuthRequest, res: Response): Promise<void> {
+export async function updateUserRole(
+  req: AuthRequest,
+  res: Response
+): Promise<void> {
   try {
     const { role } = req.body;
-    const allowedRoles = ["user", "theatreOwner", "admin"];
-    if (!allowedRoles.includes(role)) {
-      res.status(400).json({ success: false, message: "Invalid role" });
+    const allowedRoles = ["user", "admin"];
+
+    if (
+      typeof role !== "string" ||
+      !allowedRoles.includes(role)
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid role",
+      });
       return;
     }
-    if (String(req.params.id) === req.userId && role !== "admin") {
-      res.status(400).json({ success: false, message: "You cannot change your own administrator role" });
+
+    if (
+      String(req.params.id) === req.userId &&
+      role !== "admin"
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "You cannot change your own administrator role",
+      });
       return;
     }
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true, runValidators: true }).select("name email role createdAt");
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true, runValidators: true }
+    ).select("name email role createdAt");
+
     if (!user) {
-      res.status(404).json({ success: false, message: "User not found" });
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
       return;
     }
-    res.json({ success: true, message: "User role updated successfully", user });
+
+    res.json({
+      success: true,
+      message: "User role updated successfully",
+      user,
+    });
   } catch {
-    res.status(500).json({ success: false, message: "Failed to update user role" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user role",
+    });
   }
 }

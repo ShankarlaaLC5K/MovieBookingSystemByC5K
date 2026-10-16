@@ -51,8 +51,8 @@ function AdminDashboard() {
       path: "/admin/reports",
     },
     {
-      title: "Users & Owner Approval",
-      description: "Promote registered users to theatre owners and manage roles.",
+      title: "User Management",
+      description: "Manage registered users and administrator roles.",
       icon: Users,
       path: "/admin/users",
     },
