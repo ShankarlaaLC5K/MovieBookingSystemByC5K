@@ -1,8 +1,11 @@
 
 import "dotenv/config";
+import dns from "node:dns";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { User } from "../models/User";
+
+
 
 async function seedAdmin(): Promise<void> {
   const uri = process.env.MONGO_URI;
