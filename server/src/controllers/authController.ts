@@ -166,3 +166,36 @@ export async function getMe(
     });
   }
 }
+
+
+export async function listUsersForAdmin(_req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const users = await User.find().select("name email role createdAt").sort({ createdAt: -1 });
+    res.json({ success: true, users });
+  } catch {
+    res.status(500).json({ success: false, message: "Failed to list users" });
+  }
+}
+
+export async function updateUserRole(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { role } = req.body;
+    const allowedRoles = ["user", "theatreOwner", "admin"];
+    if (!allowedRoles.includes(role)) {
+      res.status(400).json({ success: false, message: "Invalid role" });
+      return;
+    }
+    if (String(req.params.id) === req.userId && role !== "admin") {
+      res.status(400).json({ success: false, message: "You cannot change your own administrator role" });
+      return;
+    }
+    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true, runValidators: true }).select("name email role createdAt");
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+    res.json({ success: true, message: "User role updated successfully", user });
+  } catch {
+    res.status(500).json({ success: false, message: "Failed to update user role" });
+  }
+}

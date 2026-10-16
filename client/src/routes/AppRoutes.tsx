@@ -30,6 +30,8 @@ import AdminShows from "../pages/AdminShows";
 import AdminBookings from "../pages/AdminBookings";
 import AdminScreens from "../pages/AdminScreens";
 import AdminReports from "../pages/AdminReports";
+import AdminUsers from "../pages/AdminUsers";
+import OwnerDashboard from "../pages/OwnerDashboard";
 
 import NotFound from "../pages/NotFound";
 
@@ -107,11 +109,16 @@ function AppRoutes() {
             />
           </Route>
 
-          <Route
-            element={
-              <ProtectedRoute adminOnly />
-            }
-          >
+          <Route element={<ProtectedRoute managerOnly />}>
+            <Route path="/owner" element={<OwnerDashboard />} />
+            <Route path="/admin/theatres" element={<AdminTheatres />} />
+            <Route path="/admin/screens" element={<AdminScreens />} />
+            <Route path="/admin/shows" element={<AdminShows />} />
+            <Route path="/admin/bookings" element={<AdminBookings />} />
+          </Route>
+
+          <Route element={<ProtectedRoute adminOnly />}>
+            <Route path="/admin/users" element={<AdminUsers />} />
             <Route
               path="/admin"
               element={<AdminDashboard />}
@@ -120,26 +127,6 @@ function AppRoutes() {
             <Route
               path="/admin/movies"
               element={<AdminMovies />}
-            />
-
-            <Route
-              path="/admin/theatres"
-              element={<AdminTheatres />}
-            />
-
-            <Route
-              path="/admin/screens"
-              element={<AdminScreens />}
-            />
-
-            <Route
-              path="/admin/shows"
-              element={<AdminShows />}
-            />
-
-            <Route
-              path="/admin/bookings"
-              element={<AdminBookings />}
             />
 
             <Route

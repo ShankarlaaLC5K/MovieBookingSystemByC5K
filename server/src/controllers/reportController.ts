@@ -1,10 +1,9 @@
-import { Response } from "express";
-import mongoose from "mongoose";
 
+import { Response } from "express";
 import { Booking } from "../models/Booking";
 import { Show } from "../models/Show";
-import { ShowSeat } from "../models/ShowSeat";
-
+import { Theatre } from "../models/Theatre";
+import { User } from "../models/User";
 import { AuthRequest } from "../middleware/authMiddleware";
 
 export const getReports = async (
@@ -17,8 +16,57 @@ export const getReports = async (
         success: false,
         message: "Authentication required",
       });
-
       return;
+    }
+
+    const currentUser = await User.findById(req.userId).select("role");
+
+    if (!currentUser) {
+      res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
+
+    if (
+      currentUser.role !== "admin" &&
+      currentUser.role !== "theatreOwner"
+    ) {
+      res.status(403).json({
+        success: false,
+        message: "Reports access denied",
+      });
+      return;
+    }
+
+    let bookingFilter: Record<string, unknown> = {};
+    let showFilter: Record<string, unknown> = {};
+
+    if (currentUser.role === "theatreOwner") {
+      const ownedTheatres = await Theatre.find({
+        owner: req.userId,
+      }).select("_id");
+
+      const ownedTheatreIds = ownedTheatres.map(
+        (theatre) => theatre._id
+      );
+
+      const ownedShows = await Show.find({
+        theatre: { $in: ownedTheatreIds },
+      }).select("_id");
+
+      const ownedShowIds = ownedShows.map(
+        (show) => show._id
+      );
+
+      bookingFilter = {
+        show: { $in: ownedShowIds },
+      };
+
+      showFilter = {
+        theatre: { $in: ownedTheatreIds },
+      };
     }
 
     const [
@@ -31,23 +79,27 @@ export const getReports = async (
       theatreOccupancy,
       bookingTrends,
     ] = await Promise.all([
-      Booking.countDocuments(),
+      Booking.countDocuments(bookingFilter),
 
       Booking.countDocuments({
+        ...bookingFilter,
         status: "confirmed",
       }),
 
       Booking.countDocuments({
+        ...bookingFilter,
         status: "pending",
       }),
 
       Booking.countDocuments({
+        ...bookingFilter,
         status: "cancelled",
       }),
 
       Booking.aggregate([
         {
           $match: {
+            ...bookingFilter,
             status: "confirmed",
           },
         },
@@ -64,6 +116,7 @@ export const getReports = async (
       Booking.aggregate([
         {
           $match: {
+            ...bookingFilter,
             status: "confirmed",
           },
         },
@@ -114,6 +167,9 @@ export const getReports = async (
       ]),
 
       Show.aggregate([
+        {
+          $match: showFilter,
+        },
         {
           $lookup: {
             from: "showseats",
@@ -170,10 +226,7 @@ export const getReports = async (
             occupancyRate: {
               $cond: [
                 {
-                  $gt: [
-                    "$totalSeats",
-                    0,
-                  ],
+                  $gt: ["$totalSeats", 0],
                 },
                 {
                   $multiply: [
@@ -200,6 +253,9 @@ export const getReports = async (
 
       Booking.aggregate([
         {
+          $match: bookingFilter,
+        },
+        {
           $group: {
             _id: {
               $dateToString: {
@@ -215,10 +271,7 @@ export const getReports = async (
               $sum: {
                 $cond: [
                   {
-                    $eq: [
-                      "$status",
-                      "confirmed",
-                    ],
+                    $eq: ["$status", "confirmed"],
                   },
                   "$totalAmount",
                   0,
@@ -229,17 +282,21 @@ export const getReports = async (
         },
         {
           $sort: {
-            _id: 1,
+            _id: -1,
           },
         },
         {
           $limit: 30,
         },
+        {
+          $sort: {
+            _id: 1,
+          },
+        },
       ]),
     ]);
 
-    const totalSales =
-      salesResult[0]?.totalSales || 0;
+    const totalSales = salesResult[0]?.totalSales || 0;
 
     res.status(200).json({
       success: true,
@@ -257,10 +314,7 @@ export const getReports = async (
       },
     });
   } catch (error) {
-    console.error(
-      "Get reports error:",
-      error
-    );
+    console.error("Get reports error:", error);
 
     res.status(500).json({
       success: false,

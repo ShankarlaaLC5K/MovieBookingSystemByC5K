@@ -1,19 +1,11 @@
 import { Router } from "express";
-
-import {
-  register,
-  login,
-  getMe,
-} from "../controllers/authController";
-
+import { register, login, getMe, listUsersForAdmin, updateUserRole } from "../controllers/authController";
 import { protect } from "../middleware/authMiddleware";
-
+import { requireAdmin } from "../middleware/rolemiddleware";
 const router = Router();
-
 router.post("/register", register);
-
 router.post("/login", login);
-
 router.get("/me", protect, getMe);
-
+router.get("/admin/users", protect, requireAdmin, listUsersForAdmin);
+router.patch("/admin/users/:id/role", protect, requireAdmin, updateUserRole);
 export default router;

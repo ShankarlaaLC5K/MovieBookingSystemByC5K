@@ -87,12 +87,12 @@ function Navbar() {
                   Profile
                 </Link>
 
-                {user.role === "admin" && (
+                {(user.role === "admin" || user.role === "theatreOwner") && (
                   <Link
-                    to="/admin"
+                    to={user.role === "admin" ? "/admin" : "/owner"}
                     className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
                   >
-                    Admin
+                    {user.role === "admin" ? "Superadmin" : "Owner Dashboard"}
                   </Link>
                 )}
 
@@ -257,13 +257,13 @@ function Navbar() {
                     Profile
                   </Link>
 
-                  {user.role === "admin" && (
+                  {(user.role === "admin" || user.role === "theatreOwner") && (
                     <Link
-                      to="/admin"
+                      to={user.role === "admin" ? "/admin" : "/owner"}
                       onClick={closeMobileMenu}
                       className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
                     >
-                      Admin
+                      {user.role === "admin" ? "Superadmin" : "Owner Dashboard"}
                     </Link>
                   )}
 

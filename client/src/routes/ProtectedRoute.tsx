@@ -4,10 +4,12 @@ import { useAuth } from "../context/AuthContext";
 
 interface ProtectedRouteProps {
   adminOnly?: boolean;
+  managerOnly?: boolean;
 }
 
 function ProtectedRoute({
   adminOnly = false,
+  managerOnly = false,
 }: ProtectedRouteProps) {
   const {
     user,
@@ -42,16 +44,17 @@ function ProtectedRoute({
     );
   }
 
-  if (
-    adminOnly &&
-    user.role !== "admin"
-  ) {
+  if (adminOnly && user.role !== "admin") {
     return (
       <Navigate
         to="/"
         replace
       />
     );
+  }
+
+  if (managerOnly && user.role !== "admin" && user.role !== "theatreOwner") {
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

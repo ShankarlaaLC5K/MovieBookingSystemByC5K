@@ -1,64 +1,14 @@
 import { Router } from "express";
-
-import {
-  createShow,
-  createShowSchedule,
-  getShows,
-  getShow,
-  getShowsByMovie,
-  getShowsByTheatre,
-  updateShow,
-  deleteShow,
-} from "../controllers/showController";
-
+import { createShow, createShowSchedule, getShows, getShow, getShowsByMovie, getShowsByTheatre, updateShow, deleteShow } from "../controllers/showController";
 import { protect } from "../middleware/authMiddleware";
-import { requireAdmin } from "../middleware/rolemiddleware";
-
+import { requireTheatreManager, requireOwnedResource } from "../middleware/rolemiddleware";
 const router = Router();
-
 router.get("/", getShows);
-
-router.get(
-  "/movie/:movieId",
-  getShowsByMovie
-);
-
-router.get(
-  "/theatre/:theatreId",
-  getShowsByTheatre
-);
-
-router.post(
-  "/schedule",
-  protect,
-  requireAdmin,
-  createShowSchedule
-);
-
-router.post(
-  "/",
-  protect,
-  requireAdmin,
-  createShow
-);
-
-router.get(
-  "/:id",
-  getShow
-);
-
-router.put(
-  "/:id",
-  protect,
-  requireAdmin,
-  updateShow
-);
-
-router.delete(
-  "/:id",
-  protect,
-  requireAdmin,
-  deleteShow
-);
-
+router.get("/movie/:movieId", getShowsByMovie);
+router.get("/theatre/:theatreId", getShowsByTheatre);
+router.post("/schedule", protect, requireTheatreManager, requireOwnedResource, createShowSchedule);
+router.post("/", protect, requireTheatreManager, requireOwnedResource, createShow);
+router.get("/:id", getShow);
+router.put("/:id", protect, requireTheatreManager, requireOwnedResource, updateShow);
+router.delete("/:id", protect, requireTheatreManager, requireOwnedResource, deleteShow);
 export default router;

@@ -6,6 +6,7 @@ import {
   Film,
   MonitorPlay,
   Ticket,
+  Users,
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
@@ -48,6 +49,12 @@ function AdminDashboard() {
         "View booking trends, sales and theatre performance.",
       icon: BarChart3,
       path: "/admin/reports",
+    },
+    {
+      title: "Users & Owner Approval",
+      description: "Promote registered users to theatre owners and manage roles.",
+      icon: Users,
+      path: "/admin/users",
     },
     {
       title: "Movie System",

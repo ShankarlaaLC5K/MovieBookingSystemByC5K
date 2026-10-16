@@ -1,40 +1,11 @@
 import { Router } from "express";
-
-import {
-  createScreen,
-  getScreensByTheatre,
-  getScreen,
-  updateScreen,
-  deleteScreen,
-} from "../controllers/screenController";
-
+import { createScreen, getScreensByTheatre, getScreen, updateScreen, deleteScreen } from "../controllers/screenController";
 import { protect } from "../middleware/authMiddleware";
-import { requireAdmin } from "../middleware/rolemiddleware";
-
+import { requireTheatreManager, requireOwnedResource } from "../middleware/rolemiddleware";
 const router = Router();
-
 router.get("/theatre/:theatreId", getScreensByTheatre);
 router.get("/:id", getScreen);
-
-router.post(
-  "/",
-  protect,
-  requireAdmin,
-  createScreen
-);
-
-router.put(
-  "/:id",
-  protect,
-  requireAdmin,
-  updateScreen
-);
-
-router.delete(
-  "/:id",
-  protect,
-  requireAdmin,
-  deleteScreen
-);
-
+router.post("/", protect, requireTheatreManager, requireOwnedResource, createScreen);
+router.put("/:id", protect, requireTheatreManager, requireOwnedResource, updateScreen);
+router.delete("/:id", protect, requireTheatreManager, requireOwnedResource, deleteScreen);
 export default router;

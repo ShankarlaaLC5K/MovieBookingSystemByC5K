@@ -3,9 +3,10 @@ import mongoose from "mongoose";
 
 import { Booking } from "../models/Booking";
 import { Show } from "../models/Show";
+import { Theatre } from "../models/Theatre";
+import { User } from "../models/User";
 import { ShowSeat } from "../models/ShowSeat";
 import { Seat } from "../models/Seat";
-import { User } from "../models/User";
 
 import {
   sendBookingCancellationEmail,
@@ -585,8 +586,16 @@ export const getAllBookings = async (
       return;
     }
 
+    const currentUser = await User.findById(req.userId).select("role");
+    let bookingFilter: Record<string, unknown> = {};
+    if (currentUser?.role === "theatreOwner") {
+      const ownedTheatres = await Theatre.find({ owner: req.userId }).select("_id");
+      const ownedTheatreIds = ownedTheatres.map((item) => item._id);
+      const ownedShows = await Show.find({ theatre: { $in: ownedTheatreIds } }).select("_id");
+      bookingFilter = { show: { $in: ownedShows.map((item) => item._id) } };
+    }
     const bookings =
-      await Booking.find()
+      await Booking.find(bookingFilter)
         .populate(
           "user",
           "name email role"
