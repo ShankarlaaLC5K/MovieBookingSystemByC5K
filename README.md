@@ -80,6 +80,7 @@ Admin Dashboard
 - for admin
     Email    - user@newtest.com
     Password - Use@123
+  
   Since the project has login for admin, First User login was controlled in MongoDB atlas.
 - for user (we can create new user as much we can. As of now. One user is created)
    Email    - user@test.com
