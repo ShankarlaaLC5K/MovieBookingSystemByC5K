@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { User } from "../models/User";
 
-
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 async function seedAdmin(): Promise<void> {
   const uri = process.env.MONGO_URI;
