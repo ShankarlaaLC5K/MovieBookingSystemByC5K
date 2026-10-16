@@ -6,11 +6,11 @@ A full-stack movie ticket booking App built using the MERN stack, were users can
 Netlify Link: https://ticketbookingsystembyc5k.netlify.app
 ---------------------------------------------------------------------
 Updated the admin ID credentials
-Login - Admin
+Login - Admin |
 Password - Admin@2026
 ---------------------------------------------------------------------
 As of Now 1 user ID created
-Login - userone@gmail.com
+Login - userone@gmail.com |
 Password - User@123
 ---------------------------------------------------------------------
 User Features
