@@ -3,14 +3,20 @@
 A full-stack movie ticket booking App built using the MERN stack, were users can explore movies, browse theatres and showtimes, select seats, and manage their bookings. Admin can manage the movie booking platform.
 ---------------------------------------------------------------------
 
-Netlify Link: https://ticketbookingsystembyc5k.netlify.app
+// Netlify Link: https://ticketbookingsystembyc5k.netlify.app {Since used the trial version, unable to deploy the project after a certain limit. So found the alternate website the build}
+
+Vercel Link: https://movie-booking-system-smoky.vercel.app/
 ---------------------------------------------------------------------
 Updated the admin ID credentials
 Login - Admin |
 Password - Admin@2026
 ---------------------------------------------------------------------
-As of Now 1 user ID created
+As of Now 2 users ID created
+User 1
 Login - userone@gmail.com |
+Password - User@123
+User 2
+Login - usertwo@gmail.com |
 Password - User@123
 ---------------------------------------------------------------------
 User Features
@@ -22,7 +28,9 @@ User Features
 - Interactive seat selection
 - View seat pricing and booking details
 - Book movie tickets
+- Wallet for advanced savings
 - View booking confirmations and booking history
+- Reschedule the movie ticket
 ---------------------------------------------------------------------
  Admin Features
 - Admin authentication and role-based access
@@ -64,7 +72,8 @@ External Services
 - Razorpay
 ---------------------------------------------------------------------
  Deployment
-- Netlify — Frontend
+- Netlify - Frontend (Initially Deployed the project in this Website)
+- Vercel - Current Frontend
 - Render — Backend
 - MongoDB Atlas — Database
 ---------------------------------------------------------------------
