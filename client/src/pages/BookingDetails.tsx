@@ -11,6 +11,7 @@ import {
   Ticket,
   XCircle,
   CreditCard,
+  ReceiptText,
 } from "lucide-react";
 
 import {
@@ -33,36 +34,26 @@ import type {
   Booking,
 } from "../types/booking";
 
+function formatAmount(amount: number): string {
+  return amount.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function BookingDetails() {
-  const {
-    id,
-  } = useParams<{
-    id: string;
-  }>();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
-  const navigate =
-    useNavigate();
-
-  const [booking, setBooking] =
-    useState<Booking | null>(null);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [cancelling, setCancelling] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState("");
 
   const loadBooking = async () => {
     if (!id) {
-      setError(
-        "Booking ID is missing."
-      );
-
+      setError("Booking ID is missing.");
       setLoading(false);
-
       return;
     }
 
@@ -70,17 +61,10 @@ function BookingDetails() {
       setLoading(true);
       setError("");
 
-      const response =
-        await getBookingById(id);
-
-      setBooking(
-        response.booking
-      );
+      const response = await getBookingById(id);
+      setBooking(response.booking);
     } catch (error: any) {
-      console.error(
-        "Failed to load booking:",
-        error
-      );
+      console.error("Failed to load booking:", error);
 
       setError(
         error?.response?.data?.message ||
@@ -92,17 +76,13 @@ function BookingDetails() {
   };
 
   useEffect(() => {
-    loadBooking();
+    void loadBooking();
   }, [id]);
 
   const handleProceedToPayment = () => {
-    if (!booking) {
-      return;
+    if (booking) {
+      navigate("/checkout/" + booking._id);
     }
-
-    navigate(
-      `/checkout/${booking._id}`
-    );
   };
 
   const handlePrint = () => {
@@ -110,33 +90,22 @@ function BookingDetails() {
   };
 
   const handleCancel = async () => {
-    if (!booking) {
-      return;
-    }
+    if (!booking) return;
 
-    const confirmed =
-      window.confirm(
-        "Are you sure you want to cancel this booking?"
-      );
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this booking?"
+    );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setCancelling(true);
       setError("");
 
-      await cancelBooking(
-        booking._id
-      );
-
+      await cancelBooking(booking._id);
       await loadBooking();
     } catch (error: any) {
-      console.error(
-        "Failed to cancel booking:",
-        error
-      );
+      console.error("Failed to cancel booking:", error);
 
       setError(
         error?.response?.data?.message ||
@@ -147,42 +116,36 @@ function BookingDetails() {
     }
   };
 
-  const formatDate = (
-    date?: string
-  ) => {
-    if (!date) {
+  const formatDate = (date?: string) => {
+    if (!date) return "N/A";
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
       return "N/A";
     }
 
-    return new Date(
-      date
-    ).toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      }
-    );
+    return parsedDate.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
   };
 
-  const formatTime = (
-    date?: string
-  ) => {
-    if (!date) {
+  const formatTime = (date?: string) => {
+    if (!date) return "N/A";
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
       return "N/A";
     }
 
-    return new Date(
-      date
-    ).toLocaleTimeString(
-      "en-IN",
-      {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }
-    );
+    return parsedDate.toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   const getSeatName = (
@@ -194,28 +157,17 @@ function BookingDetails() {
           number: number;
         }
   ) => {
-    if (
-      typeof seat === "string"
-    ) {
-      return seat;
-    }
+    if (typeof seat === "string") return seat;
 
-    if (
-      seat.row &&
-      seat.number !== undefined
-    ) {
-      return `${seat.row}${seat.number}`;
+    if (seat.row && seat.number !== undefined) {
+      return seat.row + seat.number;
     }
 
     return seat._id;
   };
 
-  const getStatusClass = (
-    status: string
-  ) => {
-    switch (
-      status.toLowerCase()
-    ) {
+  const getStatusClass = (status: string) => {
+    switch (status.toLowerCase()) {
       case "confirmed":
         return "border-green-500/20 bg-green-500/10 text-green-400";
 
@@ -262,18 +214,14 @@ function BookingDetails() {
           </h1>
 
           <p className="mt-2 text-slate-400">
-            {error ||
-              "We couldn't find this booking."}
+            {error || "We couldn't find this booking."}
           </p>
 
           <Link
             to="/bookings"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-3 font-semibold transition hover:bg-red-700"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-3 font-semibold hover:bg-red-700"
           >
-            <ArrowLeft
-              size={17}
-            />
-
+            <ArrowLeft size={17} />
             My Bookings
           </Link>
         </div>
@@ -281,59 +229,75 @@ function BookingDetails() {
     );
   }
 
+  const bookingData = booking as Booking & {
+    ticketSubtotal?: number;
+    platformFee?: number;
+    platformFeeGst?: number;
+  };
+
+  const ticketSubtotal =
+    typeof bookingData.ticketSubtotal === "number"
+      ? bookingData.ticketSubtotal
+      : null;
+
+  const platformFee =
+    typeof bookingData.platformFee === "number"
+      ? bookingData.platformFee
+      : null;
+
+  const platformFeeGst =
+    typeof bookingData.platformFeeGst === "number"
+      ? bookingData.platformFeeGst
+      : null;
+
+  const hasPriceBreakdown =
+    ticketSubtotal !== null &&
+    platformFee !== null &&
+    platformFeeGst !== null;
+
+  const totalAmount = Number(booking.totalAmount || 0);
+
   const show =
     typeof booking.show === "object"
       ? booking.show
       : null;
 
   const movie =
-    show &&
-    typeof show.movie === "object"
+    show && typeof show.movie === "object"
       ? show.movie
       : null;
 
   const theatre =
-    show &&
-    typeof show.theatre === "object"
+    show && typeof show.theatre === "object"
       ? show.theatre
       : null;
 
   const screen =
-    show &&
-    typeof show.screen === "object"
+    show && typeof show.screen === "object"
       ? show.screen
       : null;
 
   const isCancelled =
-    booking.status.toLowerCase() ===
-      "cancelled" ||
-    booking.status.toLowerCase() ===
-      "canceled";
+    ["cancelled", "canceled"].includes(
+      booking.status.toLowerCase()
+    );
 
   const isPending =
-    booking.status.toLowerCase() ===
-    "pending";
+    booking.status.toLowerCase() === "pending";
 
   const isConfirmed =
-    booking.status.toLowerCase() ===
-    "confirmed";
+    booking.status.toLowerCase() === "confirmed";
 
   return (
     <>
       <section className="min-h-[calc(100vh-140px)] bg-slate-950 px-4 py-10 text-white print:min-h-0 print:bg-white print:px-0 print:py-0 print:text-black">
         <div className="mx-auto max-w-4xl">
-
           <button
             type="button"
-            onClick={() =>
-              navigate("/bookings")
-            }
+            onClick={() => navigate("/bookings")}
             className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-400 transition hover:text-white print:hidden"
           >
-            <ArrowLeft
-              size={17}
-            />
-
+            <ArrowLeft size={17} />
             Back to My Bookings
           </button>
 
@@ -344,15 +308,15 @@ function BookingDetails() {
               </p>
 
               <h1 className="mt-1 text-3xl font-bold print:text-2xl print:text-black">
-                {booking.bookingReference ||
-                  booking._id}
+                {booking.bookingReference || booking._id}
               </h1>
             </div>
 
             <span
-              className={`inline-flex w-fit rounded-full border px-4 py-2 text-xs font-semibold uppercase print:border-slate-300 print:bg-transparent print:text-black ${getStatusClass(
-                booking.status
-              )}`}
+              className={
+                "inline-flex w-fit rounded-full border px-4 py-2 text-xs font-semibold uppercase print:border-slate-300 print:bg-transparent print:text-black " +
+                getStatusClass(booking.status)
+              }
             >
               {booking.status}
             </span>
@@ -381,43 +345,27 @@ function BookingDetails() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     type="button"
-                    onClick={
-                      handleProceedToPayment
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                    onClick={handleProceedToPayment}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
                   >
-                    <CreditCard
-                      size={17}
-                    />
-
+                    <CreditCard size={17} />
                     Proceed to Payment
                   </button>
 
                   <button
                     type="button"
-                    disabled={
-                      cancelling
-                    }
-                    onClick={
-                      handleCancel
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={cancelling}
+                    onClick={handleCancel}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                   >
                     {cancelling ? (
                       <>
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                        />
-
+                        <Loader2 size={16} className="animate-spin" />
                         Cancelling...
                       </>
                     ) : (
                       <>
-                        <XCircle
-                          size={16}
-                        />
-
+                        <XCircle size={16} />
                         Cancel Booking
                       </>
                     )}
@@ -431,14 +379,11 @@ function BookingDetails() {
             id="print-ticket"
             className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 print:rounded-none print:border print:border-slate-300 print:bg-white"
           >
-
             <div className="border-b border-slate-800 bg-linear-to-r from-red-600/20 to-slate-900 p-6 print:border-slate-300 print:bg-white">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-red-500/10 p-3 text-red-500 print:border print:border-red-200">
-                    <Ticket
-                      size={28}
-                    />
+                    <Ticket size={28} />
                   </div>
 
                   <div>
@@ -460,8 +405,7 @@ function BookingDetails() {
                   </p>
 
                   <p className="mt-1 font-bold print:text-black">
-                    {booking.bookingReference ||
-                      booking._id}
+                    {booking.bookingReference || booking._id}
                   </p>
                 </div>
               </div>
@@ -471,9 +415,7 @@ function BookingDetails() {
               <div className="border-b border-slate-800 p-6 print:border-slate-300">
                 <div className="flex items-start gap-4">
                   <div className="rounded-xl bg-red-500/10 p-3 text-red-500 print:border print:border-red-200">
-                    <Film
-                      size={26}
-                    />
+                    <Film size={26} />
                   </div>
 
                   <div>
@@ -499,18 +441,14 @@ function BookingDetails() {
               <div className="grid gap-6 border-b border-slate-800 p-6 sm:grid-cols-3 print:border-slate-300">
                 <div>
                   <div className="flex items-center gap-2 text-slate-500">
-                    <MapPin
-                      size={17}
-                    />
-
+                    <MapPin size={17} />
                     <span className="text-xs uppercase tracking-wide">
                       Theatre
                     </span>
                   </div>
 
                   <p className="mt-2 font-semibold print:text-black">
-                    {theatre?.name ||
-                      "N/A"}
+                    {theatre?.name || "N/A"}
                   </p>
 
                   {theatre?.city && (
@@ -522,42 +460,31 @@ function BookingDetails() {
 
                 <div>
                   <div className="flex items-center gap-2 text-slate-500">
-                    <Monitor
-                      size={17}
-                    />
-
+                    <Monitor size={17} />
                     <span className="text-xs uppercase tracking-wide">
                       Screen
                     </span>
                   </div>
 
                   <p className="mt-2 font-semibold print:text-black">
-                    {screen?.name ||
-                      "N/A"}
+                    {screen?.name || "N/A"}
                   </p>
                 </div>
 
                 <div>
                   <div className="flex items-center gap-2 text-slate-500">
-                    <Clock
-                      size={17}
-                    />
-
+                    <Clock size={17} />
                     <span className="text-xs uppercase tracking-wide">
                       Show Time
                     </span>
                   </div>
 
                   <p className="mt-2 font-semibold print:text-black">
-                    {formatDate(
-                      show.startTime
-                    )}
+                    {formatDate(show.startTime)}
                   </p>
 
                   <p className="mt-1 text-sm text-red-400 print:text-red-600">
-                    {formatTime(
-                      show.startTime
-                    )}
+                    {formatTime(show.startTime)}
                   </p>
                 </div>
               </div>
@@ -566,10 +493,7 @@ function BookingDetails() {
             <div className="grid gap-6 border-b border-slate-800 p-6 sm:grid-cols-3 print:border-slate-300">
               <div>
                 <div className="flex items-center gap-2 text-slate-500">
-                  <Ticket
-                    size={17}
-                  />
-
+                  <Ticket size={17} />
                   <span className="text-xs uppercase tracking-wide">
                     Seats
                   </span>
@@ -577,23 +501,14 @@ function BookingDetails() {
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {booking.seats.length > 0 ? (
-                    booking.seats.map(
-                      (
-                        seat,
-                        index
-                      ) => (
-                        <span
-                          key={`${getSeatName(
-                            seat
-                          )}-${index}`}
-                          className="rounded-lg bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-400 print:border print:border-slate-300 print:bg-white print:text-black"
-                        >
-                          {getSeatName(
-                            seat
-                          )}
-                        </span>
-                      )
-                    )
+                    booking.seats.map((seat, index) => (
+                      <span
+                        key={getSeatName(seat) + "-" + index}
+                        className="rounded-lg bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-400 print:border print:border-slate-300 print:bg-white print:text-black"
+                      >
+                        {getSeatName(seat)}
+                      </span>
+                    ))
                   ) : (
                     <span className="text-sm text-slate-400">
                       No seats
@@ -604,40 +519,126 @@ function BookingDetails() {
 
               <div>
                 <div className="flex items-center gap-2 text-slate-500">
-                  <CalendarDays
-                    size={17}
-                  />
-
+                  <CalendarDays size={17} />
                   <span className="text-xs uppercase tracking-wide">
                     Booked On
                   </span>
                 </div>
 
                 <p className="mt-2 font-semibold print:text-black">
-                  {formatDate(
-                    booking.createdAt
-                  )}
+                  {formatDate(booking.createdAt)}
                 </p>
               </div>
 
               <div>
                 <div className="flex items-center gap-2 text-slate-500">
-                  <CheckCircle2
-                    size={17}
-                  />
-
+                  <CheckCircle2 size={17} />
                   <span className="text-xs uppercase tracking-wide">
                     Total Amount
                   </span>
                 </div>
 
                 <p className="mt-2 text-xl font-bold text-red-400 print:text-red-600">
-                  ₹
-                  {Number(
-                    booking.totalAmount
-                  ).toFixed(2)}
+                  ₹{formatAmount(totalAmount)}
                 </p>
               </div>
+            </div>
+
+            <div className="border-b border-slate-800 p-6 print:border-slate-300">
+              <div className="mb-4 flex items-center gap-2">
+                <ReceiptText size={19} className="text-red-400" />
+
+                <h3 className="font-bold print:text-black">
+                  Ticket Price Breakdown
+                </h3>
+              </div>
+
+              {hasPriceBreakdown ? (
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-slate-200 print:text-black">
+                        Ticket price
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        {booking.seats.length} ticket(s)
+                      </p>
+                    </div>
+
+                    <p className="font-semibold tabular-nums print:text-black">
+                      ₹{formatAmount(ticketSubtotal)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-slate-200 print:text-black">
+                        Platform fee
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Booking service charge
+                      </p>
+                    </div>
+
+                    <p className="font-semibold tabular-nums print:text-black">
+                      ₹{formatAmount(platformFee)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-slate-200 print:text-black">
+                        GST (18%)
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        18% of platform fee
+                      </p>
+                    </div>
+
+                    <p className="font-semibold tabular-nums print:text-black">
+                      ₹{formatAmount(platformFeeGst)}
+                    </p>
+                  </div>
+
+                  <div className="border-t border-dashed border-slate-700 pt-4 print:border-slate-300">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-lg font-bold print:text-black">
+                          Total Amount
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Including listed charges
+                        </p>
+                      </div>
+
+                      <p className="text-2xl font-extrabold tabular-nums text-red-400 print:text-red-600">
+                        ₹{formatAmount(totalAmount)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm leading-6 text-slate-400 print:text-slate-600">
+                    The detailed breakdown is unavailable for this booking.
+                    The total shown above is the amount saved on the booking.
+                  </p>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-4 print:border-slate-300">
+                    <p className="font-bold print:text-black">
+                      Total Amount
+                    </p>
+
+                    <p className="text-xl font-bold text-red-400 print:text-red-600">
+                      ₹{formatAmount(totalAmount)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-b border-slate-800 p-6 print:border-slate-300">
@@ -674,15 +675,11 @@ function BookingDetails() {
             </div>
 
             <div className="flex flex-col gap-3 p-6 sm:flex-row sm:justify-end print:hidden">
-
               <Link
                 to="/bookings"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white"
               >
-                <ArrowLeft
-                  size={16}
-                />
-
+                <ArrowLeft size={16} />
                 My Bookings
               </Link>
 
@@ -690,43 +687,27 @@ function BookingDetails() {
                 <>
                   <button
                     type="button"
-                    onClick={
-                      handleProceedToPayment
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                    onClick={handleProceedToPayment}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
                   >
-                    <CreditCard
-                      size={17}
-                    />
-
+                    <CreditCard size={17} />
                     Proceed to Payment
                   </button>
 
                   <button
                     type="button"
-                    disabled={
-                      cancelling
-                    }
-                    onClick={
-                      handleCancel
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={cancelling}
+                    onClick={handleCancel}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                   >
                     {cancelling ? (
                       <>
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                        />
-
+                        <Loader2 size={16} className="animate-spin" />
                         Cancelling...
                       </>
                     ) : (
                       <>
-                        <XCircle
-                          size={16}
-                        />
-
+                        <XCircle size={16} />
                         Cancel Booking
                       </>
                     )}
@@ -738,43 +719,27 @@ function BookingDetails() {
                 <>
                   <button
                     type="button"
-                    onClick={
-                      handlePrint
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+                    onClick={handlePrint}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700"
                   >
-                    <Printer
-                      size={17}
-                    />
-
+                    <Printer size={17} />
                     Print Ticket
                   </button>
 
                   <button
                     type="button"
-                    disabled={
-                      cancelling
-                    }
-                    onClick={
-                      handleCancel
-                    }
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={cancelling}
+                    onClick={handleCancel}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/30 px-5 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                   >
                     {cancelling ? (
                       <>
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                        />
-
+                        <Loader2 size={16} className="animate-spin" />
                         Cancelling...
                       </>
                     ) : (
                       <>
-                        <XCircle
-                          size={16}
-                        />
-
+                        <XCircle size={16} />
                         Cancel Booking
                       </>
                     )}
@@ -787,7 +752,6 @@ function BookingDetails() {
                   Booking Cancelled
                 </span>
               )}
-
             </div>
           </div>
         </div>

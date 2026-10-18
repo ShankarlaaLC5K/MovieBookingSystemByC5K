@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -23,128 +24,125 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   error: string | null;
-
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  refreshUser: () => Promise<void>;
 }
 
-const AuthContext = createContext<
-  AuthContextType | undefined
->(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-export function AuthProvider({
-  children,
-}: AuthProviderProps) {
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-
   const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem("token")
+    localStorage.getItem("token")
   );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [loading, setLoading] =
-    useState<boolean>(true);
+  const refreshUser = useCallback(async (): Promise<void> => {
+    const savedToken = localStorage.getItem("token");
 
-  const [error, setError] =
-    useState<string | null>(null);
+    if (!savedToken) {
+      setUser(null);
+      setToken(null);
+      return;
+    }
+
+    const response = await getMe();
+    setUser(response.user);
+    setToken(savedToken);
+  }, []);
 
   useEffect(() => {
-    const restoreUser = async () => {
-      const storedToken =
-        localStorage.getItem("token");
+    let active = true;
 
-      if (!storedToken) {
-        setLoading(false);
+    async function restoreUser() {
+      const savedToken = localStorage.getItem("token");
+
+      if (!savedToken) {
+        if (active) {
+          setUser(null);
+          setToken(null);
+          setLoading(false);
+        }
         return;
       }
 
       try {
         const response = await getMe();
 
-        setUser(response.user);
-        setToken(storedToken);
+        if (active) {
+          setUser(response.user);
+          setToken(savedToken);
+        }
       } catch {
-        localStorage.removeItem("token");
-
-        setToken(null);
-        setUser(null);
+        if (active) {
+          localStorage.removeItem("token");
+          setUser(null);
+          setToken(null);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
-    };
+    }
 
-    restoreUser();
+    void restoreUser();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const login = async (
-    data: LoginData
-  ): Promise<void> => {
-    try {
-      setError(null);
+  async function login(data: LoginData): Promise<void> {
+    setError(null);
 
+    try {
       const response = await loginUser(data);
 
-      localStorage.setItem(
-        "token",
-        response.token
-      );
-
+      localStorage.setItem("token", response.token);
       setToken(response.token);
       setUser(response.user);
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        "Login failed. Please try again.";
-
-      setError(message);
-
-      throw new Error(message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed");
+      throw err;
     }
-  };
+  }
 
-  const register = async (
-    data: RegisterData
-  ): Promise<void> => {
+  async function register(data: RegisterData): Promise<void> {
+    setError(null);
+
     try {
-      setError(null);
+      const response = await registerUser(data);
 
-      const response =
-        await registerUser(data);
-
-      localStorage.setItem(
-        "token",
-        response.token
-      );
-
+      localStorage.setItem("token", response.token);
       setToken(response.token);
       setUser(response.user);
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        "Registration failed. Please try again.";
-
-      setError(message);
-
-      throw new Error(message);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Registration failed"
+      );
+      throw err;
     }
-  };
+  }
 
-  const logout = (): void => {
+  function logout(): void {
     localStorage.removeItem("token");
-
     setToken(null);
     setUser(null);
     setError(null);
-  };
+  }
 
-  const clearError = (): void => {
+  function clearError(): void {
     setError(null);
-  };
+  }
 
   return (
     <AuthContext.Provider
@@ -157,6 +155,7 @@ export function AuthProvider({
         register,
         logout,
         clearError,
+        refreshUser,
       }}
     >
       {children}
@@ -168,9 +167,7 @@ export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error(
-      "useAuth must be used inside AuthProvider"
-    );
+    throw new Error("useAuth must be used within an AuthProvider");
   }
 
   return context;

@@ -8,29 +8,22 @@ import {
 
 interface BookingContextType {
   showId: string | null;
-
   seatIds: string[];
   selectedSeatIds: string[];
-
   seatNames: string[];
   selectedSeatNames: string[];
-
   expiresAt: number | null;
-
   setBooking: (
     showId: string,
     seatIds: string[],
     seatNames: string[],
     expiresAt: number
   ) => void;
-
   clearBooking: () => void;
 }
 
 const BookingContext =
-  createContext<BookingContextType | undefined>(
-    undefined
-  );
+  createContext<BookingContextType | undefined>(undefined);
 
 interface BookingProviderProps {
   children: ReactNode;
@@ -48,66 +41,60 @@ interface StoredBooking {
 export function BookingProvider({
   children,
 }: BookingProviderProps) {
-  const [showId, setShowId] =
-    useState<string | null>(null);
-
-  const [seatIds, setSeatIds] =
-    useState<string[]>([]);
-
-  const [seatNames, setSeatNames] =
-    useState<string[]>([]);
-
-  const [expiresAt, setExpiresAt] =
-    useState<number | null>(null);
+  const [showId, setShowId] = useState<string | null>(null);
+  const [seatIds, setSeatIds] = useState<string[]>([]);
+  const [seatNames, setSeatNames] = useState<string[]>([]);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
 
   useEffect(() => {
-    const stored =
-      localStorage.getItem(STORAGE_KEY);
-
-    if (!stored) {
-      return;
-    }
-
     try {
-      const booking: StoredBooking =
-        JSON.parse(stored);
+      const stored = localStorage.getItem(STORAGE_KEY);
 
-      if (
-        !booking.showId ||
-        !booking.seatIds?.length ||
-        !booking.expiresAt
-      ) {
-        localStorage.removeItem(
-          STORAGE_KEY
-        );
+      if (!stored) return;
 
-        return;
-      }
+      const booking: StoredBooking = JSON.parse(stored);
 
-      if (
-        booking.expiresAt <= Date.now()
-      ) {
-        localStorage.removeItem(
-          STORAGE_KEY
-        );
+      const valid =
+        typeof booking.showId === "string" &&
+        booking.showId.length > 0 &&
+        Array.isArray(booking.seatIds) &&
+        booking.seatIds.length > 0 &&
+        typeof booking.expiresAt === "number" &&
+        Number.isFinite(booking.expiresAt) &&
+        booking.expiresAt > Date.now();
 
+      if (!valid) {
+        localStorage.removeItem(STORAGE_KEY);
         return;
       }
 
       setShowId(booking.showId);
       setSeatIds(booking.seatIds);
       setSeatNames(
-        booking.seatNames || []
+        Array.isArray(booking.seatNames) ? booking.seatNames : []
       );
-      setExpiresAt(
-        booking.expiresAt
-      );
+      setExpiresAt(booking.expiresAt);
     } catch {
-      localStorage.removeItem(
-        STORAGE_KEY
-      );
+      localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    if (expiresAt === null) return;
+
+    const remaining = expiresAt - Date.now();
+
+    if (remaining <= 0) {
+      clearBooking();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      clearBooking();
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [expiresAt]);
 
   const setBooking = (
     newShowId: string,
@@ -115,48 +102,48 @@ export function BookingProvider({
     newSeatNames: string[],
     newExpiresAt: number
   ) => {
-    setShowId(newShowId);
-    setSeatIds(newSeatIds);
-    setSeatNames(newSeatNames);
-    setExpiresAt(newExpiresAt);
+    if (
+      !newShowId ||
+      newSeatIds.length === 0 ||
+      !Number.isFinite(newExpiresAt) ||
+      newExpiresAt <= Date.now()
+    ) {
+      clearBooking();
+      return;
+    }
 
     const booking: StoredBooking = {
       showId: newShowId,
-      seatIds: newSeatIds,
-      seatNames: newSeatNames,
+      seatIds: [...newSeatIds],
+      seatNames: [...newSeatNames],
       expiresAt: newExpiresAt,
     };
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(booking)
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(booking));
+
+    setShowId(newShowId);
+    setSeatIds([...newSeatIds]);
+    setSeatNames([...newSeatNames]);
+    setExpiresAt(newExpiresAt);
   };
 
   const clearBooking = () => {
+    localStorage.removeItem(STORAGE_KEY);
     setShowId(null);
     setSeatIds([]);
     setSeatNames([]);
     setExpiresAt(null);
-
-    localStorage.removeItem(
-      STORAGE_KEY
-    );
   };
 
   return (
     <BookingContext.Provider
       value={{
         showId,
-
         seatIds,
         selectedSeatIds: seatIds,
-
         seatNames,
         selectedSeatNames: seatNames,
-
         expiresAt,
-
         setBooking,
         clearBooking,
       }}
@@ -167,13 +154,10 @@ export function BookingProvider({
 }
 
 export function useBooking(): BookingContextType {
-  const context =
-    useContext(BookingContext);
+  const context = useContext(BookingContext);
 
   if (!context) {
-    throw new Error(
-      "useBooking must be used inside BookingProvider"
-    );
+    throw new Error("useBooking must be used inside BookingProvider");
   }
 
   return context;

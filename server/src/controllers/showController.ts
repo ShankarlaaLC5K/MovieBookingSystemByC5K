@@ -20,7 +20,158 @@ interface ScheduleRequest {
   showTimes: string[];
   language: string;
   format?: ShowFormat;
-  price: number;
+  balconyPrice: number;
+  firstClassPrice: number;
+  secondClassPrice: number;
+}
+
+interface ClassPrices {
+  balconyPrice: number;
+  firstClassPrice: number;
+  secondClassPrice: number;
+}
+
+function validatePrices(
+  balconyPrice: unknown,
+  firstClassPrice: unknown,
+  secondClassPrice: unknown
+): ClassPrices | null {
+  const values = [
+    balconyPrice,
+    firstClassPrice,
+    secondClassPrice,
+  ];
+
+  for (const value of values) {
+    if (
+      value === undefined ||
+      value === null ||
+      String(value).trim() === ""
+    ) {
+      return null;
+    }
+  }
+
+  const balcony = Number(balconyPrice);
+  const first = Number(firstClassPrice);
+  const second = Number(secondClassPrice);
+
+  if (
+    !Number.isFinite(balcony) ||
+    !Number.isFinite(first) ||
+    !Number.isFinite(second) ||
+    balcony < 0 ||
+    first < 0 ||
+    second < 0
+  ) {
+    return null;
+  }
+
+  return {
+    balconyPrice: balcony,
+    firstClassPrice: first,
+    secondClassPrice: second,
+  };
+}
+
+function normalizeFormat(
+  format: unknown
+): ShowFormat | null {
+  const value = String(
+    format === undefined ? "2D" : format
+  ).toUpperCase();
+
+  if (
+    value !== "2D" &&
+    value !== "3D" &&
+    value !== "IMAX"
+  ) {
+    return null;
+  }
+
+  return value as ShowFormat;
+}
+
+async function validateShowReferences(
+  movie: string,
+  theatre: string,
+  screen: string,
+  res: Response
+): Promise<boolean> {
+  if (
+    !mongoose.Types.ObjectId.isValid(movie) ||
+    !mongoose.Types.ObjectId.isValid(theatre) ||
+    !mongoose.Types.ObjectId.isValid(screen)
+  ) {
+    res.status(400).json({
+      success: false,
+      message: "Invalid movie, theatre or screen ID",
+    });
+    return false;
+  }
+
+  const movieExists = await Movie.findById(movie);
+
+  if (!movieExists) {
+    res.status(404).json({
+      success: false,
+      message: "Movie not found",
+    });
+    return false;
+  }
+
+  const theatreExists = await Theatre.findById(theatre);
+
+  if (!theatreExists) {
+    res.status(404).json({
+      success: false,
+      message: "Theatre not found",
+    });
+    return false;
+  }
+
+  const screenExists = await Screen.findById(screen);
+
+  if (!screenExists) {
+    res.status(404).json({
+      success: false,
+      message: "Screen not found",
+    });
+    return false;
+  }
+
+  if (screenExists.theatre.toString() !== theatre) {
+    res.status(400).json({
+      success: false,
+      message: "Screen does not belong to the selected theatre",
+    });
+    return false;
+  }
+
+  return true;
+}
+
+async function findScheduleConflict(
+  screenId: string,
+  startTime: Date,
+  endTime: Date,
+  excludedShowId?: string
+) {
+  const query: Record<string, unknown> = {
+    screen: new mongoose.Types.ObjectId(screenId),
+    startTime: { $lt: endTime },
+    endTime: { $gt: startTime },
+  };
+
+  if (excludedShowId) {
+    query._id = {
+      $ne: new mongoose.Types.ObjectId(excludedShowId),
+    };
+  }
+
+  return Show.findOne(query).select(
+    "_id startTime endTime"
+  );
 }
 
 export async function createShow(
@@ -36,7 +187,9 @@ export async function createShow(
       endTime,
       language,
       format,
-      price,
+      balconyPrice,
+      firstClassPrice,
+      secondClassPrice,
     } = req.body;
 
     if (
@@ -45,13 +198,12 @@ export async function createShow(
       !screen ||
       !startTime ||
       !endTime ||
-      !language ||
-      price === undefined
+      !language
     ) {
       res.status(400).json({
         success: false,
         message:
-          "Movie, theatre, screen, startTime, endTime, language and price are required",
+          "Movie, theatre, screen, startTime, endTime and language are required",
       });
       return;
     }
@@ -59,66 +211,49 @@ export async function createShow(
     const movieId = String(movie);
     const theatreId = String(theatre);
     const screenId = String(screen);
+    const normalizedLanguage = String(language).trim();
 
-    if (!mongoose.Types.ObjectId.isValid(movieId)) {
+    if (!normalizedLanguage) {
       res.status(400).json({
         success: false,
-        message: "Invalid movie ID",
+        message: "Language cannot be empty",
       });
       return;
     }
 
-    if (!mongoose.Types.ObjectId.isValid(theatreId)) {
+    const prices = validatePrices(
+      balconyPrice,
+      firstClassPrice,
+      secondClassPrice
+    );
+
+    if (!prices) {
       res.status(400).json({
         success: false,
-        message: "Invalid theatre ID",
+        message:
+          "Valid non-negative prices for Balcony, First Class and Second Class are required",
       });
       return;
     }
 
-    if (!mongoose.Types.ObjectId.isValid(screenId)) {
+    const normalizedFormat = normalizeFormat(format);
+
+    if (!normalizedFormat) {
       res.status(400).json({
         success: false,
-        message: "Invalid screen ID",
+        message: "Format must be 2D, 3D or IMAX",
       });
       return;
     }
 
-    const movieExists = await Movie.findById(movieId);
+    const referencesValid = await validateShowReferences(
+      movieId,
+      theatreId,
+      screenId,
+      res
+    );
 
-    if (!movieExists) {
-      res.status(404).json({
-        success: false,
-        message: "Movie not found",
-      });
-      return;
-    }
-
-    const theatreExists = await Theatre.findById(theatreId);
-
-    if (!theatreExists) {
-      res.status(404).json({
-        success: false,
-        message: "Theatre not found",
-      });
-      return;
-    }
-
-    const screenExists = await Screen.findById(screenId);
-
-    if (!screenExists) {
-      res.status(404).json({
-        success: false,
-        message: "Screen not found",
-      });
-      return;
-    }
-
-    if (screenExists.theatre.toString() !== theatreId) {
-      res.status(400).json({
-        success: false,
-        message: "Screen does not belong to the selected theatre",
-      });
+    if (!referencesValid) {
       return;
     }
 
@@ -144,37 +279,11 @@ export async function createShow(
       return;
     }
 
-    const showPrice = Number(price);
-
-    if (!Number.isFinite(showPrice) || showPrice < 0) {
-      res.status(400).json({
-        success: false,
-        message: "Price must be a valid non-negative number",
-      });
-      return;
-    }
-
-    const normalizedFormat = String(
-      format === undefined ? "2D" : format
-    ).toUpperCase();
-
-    if (
-      normalizedFormat !== "2D" &&
-      normalizedFormat !== "3D" &&
-      normalizedFormat !== "IMAX"
-    ) {
-      res.status(400).json({
-        success: false,
-        message: "Format must be 2D, 3D or IMAX",
-      });
-      return;
-    }
-
-    const overlappingShow = await Show.findOne({
-      screen: new mongoose.Types.ObjectId(screenId),
-      startTime: { $lt: end },
-      endTime: { $gt: start },
-    });
+    const overlappingShow = await findScheduleConflict(
+      screenId,
+      start,
+      end
+    );
 
     if (overlappingShow) {
       res.status(409).json({
@@ -196,9 +305,12 @@ export async function createShow(
       screen: new mongoose.Types.ObjectId(screenId),
       startTime: start,
       endTime: end,
-      language: String(language).trim(),
-      format: normalizedFormat as ShowFormat,
-      price: showPrice,
+      language: normalizedLanguage,
+      format: normalizedFormat,
+      price: prices.secondClassPrice,
+      balconyPrice: prices.balconyPrice,
+      firstClassPrice: prices.firstClassPrice,
+      secondClassPrice: prices.secondClassPrice,
     });
 
     const seats = await Seat.find({
@@ -217,10 +329,7 @@ export async function createShow(
 
     const populatedShow = await Show.findById(show._id)
       .populate("movie", "title posterPath tmdbId runtime")
-      .populate(
-        "theatre",
-        "name address city state pincode"
-      )
+      .populate("theatre", "name address city state pincode")
       .populate("screen", "name totalSeats");
 
     res.status(201).json({
@@ -253,7 +362,9 @@ export async function createShowSchedule(
       showTimes,
       language,
       format,
-      price,
+      balconyPrice,
+      firstClassPrice,
+      secondClassPrice,
     } = req.body as ScheduleRequest;
 
     if (
@@ -264,13 +375,12 @@ export async function createShowSchedule(
       dates.length === 0 ||
       !Array.isArray(showTimes) ||
       showTimes.length === 0 ||
-      !language ||
-      price === undefined
+      !language
     ) {
       res.status(400).json({
         success: false,
         message:
-          "Movie, theatre, screen, dates, showTimes, language and price are required",
+          "Movie, theatre, screen, dates, showTimes, language and class prices are required",
       });
       return;
     }
@@ -278,69 +388,6 @@ export async function createShowSchedule(
     const movieId = String(movie);
     const theatreId = String(theatre);
     const screenId = String(screen);
-
-    if (!mongoose.Types.ObjectId.isValid(movieId)) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid movie ID",
-      });
-      return;
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(theatreId)) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid theatre ID",
-      });
-      return;
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(screenId)) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid screen ID",
-      });
-      return;
-    }
-
-    const movieExists = await Movie.findById(movieId);
-
-    if (!movieExists) {
-      res.status(404).json({
-        success: false,
-        message: "Movie not found",
-      });
-      return;
-    }
-
-    const theatreExists = await Theatre.findById(theatreId);
-
-    if (!theatreExists) {
-      res.status(404).json({
-        success: false,
-        message: "Theatre not found",
-      });
-      return;
-    }
-
-    const screenExists = await Screen.findById(screenId);
-
-    if (!screenExists) {
-      res.status(404).json({
-        success: false,
-        message: "Screen not found",
-      });
-      return;
-    }
-
-    if (screenExists.theatre.toString() !== theatreId) {
-      res.status(400).json({
-        success: false,
-        message: "Screen does not belong to the selected theatre",
-      });
-      return;
-    }
-
     const normalizedLanguage = String(language).trim();
 
     if (!normalizedLanguage) {
@@ -351,25 +398,24 @@ export async function createShowSchedule(
       return;
     }
 
-    const showPrice = Number(price);
+    const prices = validatePrices(
+      balconyPrice,
+      firstClassPrice,
+      secondClassPrice
+    );
 
-    if (!Number.isFinite(showPrice) || showPrice < 0) {
+    if (!prices) {
       res.status(400).json({
         success: false,
-        message: "Price must be a valid non-negative number",
+        message:
+          "Valid non-negative prices for Balcony, First Class and Second Class are required",
       });
       return;
     }
 
-    const normalizedFormat = String(
-      format === undefined ? "2D" : format
-    ).toUpperCase();
+    const normalizedFormat = normalizeFormat(format);
 
-    if (
-      normalizedFormat !== "2D" &&
-      normalizedFormat !== "3D" &&
-      normalizedFormat !== "IMAX"
-    ) {
+    if (!normalizedFormat) {
       res.status(400).json({
         success: false,
         message: "Format must be 2D, 3D or IMAX",
@@ -377,35 +423,47 @@ export async function createShowSchedule(
       return;
     }
 
-    const uniqueDates = [
-      ...new Set(
-        dates.map((date) => String(date).trim())
-      ),
-    ];
+    const referencesValid = await validateShowReferences(
+      movieId,
+      theatreId,
+      screenId,
+      res
+    );
 
-    const uniqueShowTimes = [
-      ...new Set(
-        showTimes.map((time) => String(time).trim())
-      ),
-    ];
+    if (!referencesValid) {
+      return;
+    }
+
+    const uniqueDates = Array.from(
+      new Set(dates.map((date) => String(date).trim()))
+    );
+
+    const uniqueShowTimes = Array.from(
+      new Set(showTimes.map((time) => String(time).trim()))
+    );
 
     for (const date of uniqueDates) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         res.status(400).json({
           success: false,
-          message: `Invalid date: ${date}`,
+          message: "Invalid date: " + date,
         });
         return;
       }
 
+      const dateParts = date.split("-").map(Number);
       const testDate = new Date(
-        `${date}T00:00:00${IST_OFFSET}`
+        Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2])
       );
 
-      if (Number.isNaN(testDate.getTime())) {
+      if (
+        testDate.getUTCFullYear() !== dateParts[0] ||
+        testDate.getUTCMonth() !== dateParts[1] - 1 ||
+        testDate.getUTCDate() !== dateParts[2]
+      ) {
         res.status(400).json({
           success: false,
-          message: `Invalid date: ${date}`,
+          message: "Invalid date: " + date,
         });
         return;
       }
@@ -415,14 +473,14 @@ export async function createShowSchedule(
       if (!/^\d{2}:\d{2}$/.test(time)) {
         res.status(400).json({
           success: false,
-          message: `Invalid show time: ${time}`,
+          message: "Invalid show time: " + time,
         });
         return;
       }
 
-      const [hours, minutes] = time
-        .split(":")
-        .map(Number);
+      const timeParts = time.split(":").map(Number);
+      const hours = timeParts[0];
+      const minutes = timeParts[1];
 
       if (
         hours < 0 ||
@@ -432,10 +490,20 @@ export async function createShowSchedule(
       ) {
         res.status(400).json({
           success: false,
-          message: `Invalid show time: ${time}`,
+          message: "Invalid show time: " + time,
         });
         return;
       }
+    }
+
+    const movieExists = await Movie.findById(movieId);
+
+    if (!movieExists) {
+      res.status(404).json({
+        success: false,
+        message: "Movie not found",
+      });
+      return;
     }
 
     const runtimeMinutes =
@@ -453,21 +521,19 @@ export async function createShowSchedule(
     for (const date of uniqueDates) {
       for (const time of uniqueShowTimes) {
         const startTime = new Date(
-          `${date}T${time}:00${IST_OFFSET}`
+          date + "T" + time + ":00" + IST_OFFSET
         );
 
         if (Number.isNaN(startTime.getTime())) {
           res.status(400).json({
             success: false,
-            message:
-              `Invalid schedule: ${date} ${time}`,
+            message: "Invalid schedule: " + date + " " + time,
           });
           return;
         }
 
         const endTime = new Date(
-          startTime.getTime() +
-            runtimeMinutes * 60 * 1000
+          startTime.getTime() + runtimeMinutes * 60 * 1000
         );
 
         schedules.push({
@@ -481,8 +547,7 @@ export async function createShowSchedule(
 
     schedules.sort(
       (a, b) =>
-        a.startTime.getTime() -
-        b.startTime.getTime()
+        a.startTime.getTime() - b.startTime.getTime()
     );
 
     for (let i = 0; i < schedules.length; i++) {
@@ -494,10 +559,7 @@ export async function createShowSchedule(
           break;
         }
 
-        if (
-          schedules[i].date ===
-          schedules[j].date
-        ) {
+        if (schedules[i].date === schedules[j].date) {
           res.status(409).json({
             success: false,
             message:
@@ -527,31 +589,19 @@ export async function createShowSchedule(
     }[] = [];
 
     for (const schedule of schedules) {
-      const conflictingShow =
-        await Show.findOne({
-          screen: new mongoose.Types.ObjectId(
-            screenId
-          ),
-          startTime: {
-            $lt: schedule.endTime,
-          },
-          endTime: {
-            $gt: schedule.startTime,
-          },
-        }).select(
-          "_id startTime endTime"
-        );
+      const conflictingShow = await findScheduleConflict(
+        screenId,
+        schedule.startTime,
+        schedule.endTime
+      );
 
       if (conflictingShow) {
         conflicts.push({
           date: schedule.date,
           time: schedule.time,
-          existingShowId:
-            conflictingShow._id.toString(),
-          existingStartTime:
-            conflictingShow.startTime,
-          existingEndTime:
-            conflictingShow.endTime,
+          existingShowId: conflictingShow._id.toString(),
+          existingStartTime: conflictingShow.startTime,
+          existingEndTime: conflictingShow.endTime,
         });
       }
     }
@@ -573,116 +623,72 @@ export async function createShowSchedule(
     if (seats.length === 0) {
       res.status(404).json({
         success: false,
-        message:
-          "No seats found for the selected screen",
+        message: "No seats found for the selected screen",
       });
       return;
     }
 
-    let createdShows: mongoose.Document[] = [];
+    let createdShowIds: mongoose.Types.ObjectId[] = [];
 
     await session.withTransaction(async () => {
-      const createdShowDocuments = [];
+      const showIds: mongoose.Types.ObjectId[] = [];
 
       for (const schedule of schedules) {
         const showDocuments = await Show.create(
           [
             {
-              movie: new mongoose.Types.ObjectId(
-                movieId
-              ),
-              theatre:
-                new mongoose.Types.ObjectId(
-                  theatreId
-                ),
-              screen:
-                new mongoose.Types.ObjectId(
-                  screenId
-                ),
-              startTime:
-                schedule.startTime,
-              endTime:
-                schedule.endTime,
-              language:
-                normalizedLanguage,
-              format:
-                normalizedFormat as ShowFormat,
-              price: showPrice,
+              movie: new mongoose.Types.ObjectId(movieId),
+              theatre: new mongoose.Types.ObjectId(theatreId),
+              screen: new mongoose.Types.ObjectId(screenId),
+              startTime: schedule.startTime,
+              endTime: schedule.endTime,
+              language: normalizedLanguage,
+              format: normalizedFormat,
+              price: prices.secondClassPrice,
+              balconyPrice: prices.balconyPrice,
+              firstClassPrice: prices.firstClassPrice,
+              secondClassPrice: prices.secondClassPrice,
             },
           ],
-          {
-            session,
-          }
+          { session }
         );
 
-        createdShowDocuments.push(
-          showDocuments[0]
-        );
-
-        const showSeats = seats.map(
-          (seat) => ({
-            show: showDocuments[0]._id,
-            seat: seat._id,
-            status:
-              "available" as const,
-          })
-        );
+        const createdShow = showDocuments[0];
+        showIds.push(createdShow._id);
 
         await ShowSeat.insertMany(
-          showSeats,
-          {
-            session,
-          }
+          seats.map((seat) => ({
+            show: createdShow._id,
+            seat: seat._id,
+            status: "available" as const,
+          })),
+          { session }
         );
       }
 
-      createdShows =
-        createdShowDocuments;
+      createdShowIds = showIds;
     });
 
-    const createdShowIds =
-      createdShows.map(
-        (show) => show._id
-      );
-
-    const populatedShows =
-      await Show.find({
-        _id: {
-          $in: createdShowIds,
-        },
-      })
-        .populate(
-          "movie",
-          "title posterPath tmdbId runtime"
-        )
-        .populate(
-          "theatre",
-          "name address city state pincode"
-        )
-        .populate(
-          "screen",
-          "name totalSeats"
-        )
-        .sort({
-          startTime: 1,
-        });
+    const populatedShows = await Show.find({
+      _id: { $in: createdShowIds },
+    })
+      .populate("movie", "title posterPath tmdbId runtime")
+      .populate("theatre", "name address city state pincode")
+      .populate("screen", "name totalSeats")
+      .sort({ startTime: 1 });
 
     res.status(201).json({
       success: true,
-      message: `${populatedShows.length} shows created successfully`,
+      message: String(populatedShows.length) + " shows created successfully",
       count: populatedShows.length,
       shows: populatedShows,
     });
   } catch (error) {
-    console.error(
-      "Create show schedule error:",
-      error
-    );
+    console.error("Create show schedule error:", error);
 
     res.status(500).json({
       success: false,
-      message:
-        "Failed to create show schedule",
+      message: "Failed to create show schedule",
     });
   } finally {
     await session.endSession();
@@ -695,21 +701,10 @@ export async function getShows(
 ): Promise<void> {
   try {
     const shows = await Show.find()
-      .populate(
-        "movie",
-        "title posterPath tmdbId runtime"
-      )
-      .populate(
-        "theatre",
-        "name address city state pincode"
-      )
-      .populate(
-        "screen",
-        "name totalSeats"
-      )
-      .sort({
-        startTime: 1,
-      });
+      .populate("movie", "title posterPath tmdbId runtime")
+      .populate("theatre", "name address city state pincode")
+      .populate("screen", "name totalSeats")
+      .sort({ startTime: 1 });
 
     res.json({
       success: true,
@@ -717,10 +712,7 @@ export async function getShows(
       shows,
     });
   } catch (error) {
-    console.error(
-      "Get shows error:",
-      error
-    );
+    console.error("Get shows error:", error);
 
     res.status(500).json({
       success: false,
@@ -734,15 +726,9 @@ export async function getShow(
   res: Response
 ): Promise<void> {
   try {
-    const showId = String(
-      req.params.id
-    );
+    const showId = String(req.params.id);
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        showId
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(showId)) {
       res.status(400).json({
         success: false,
         message: "Invalid show ID",
@@ -750,21 +736,13 @@ export async function getShow(
       return;
     }
 
-    const show = await Show.findById(
-      showId
-    )
+    const show = await Show.findById(showId)
       .populate(
         "movie",
         "title overview posterPath backdropPath tmdbId runtime"
       )
-      .populate(
-        "theatre",
-        "name address city state pincode"
-      )
-      .populate(
-        "screen",
-        "name totalSeats"
-      );
+      .populate("theatre", "name address city state pincode")
+      .populate("screen", "name totalSeats");
 
     if (!show) {
       res.status(404).json({
@@ -779,10 +757,7 @@ export async function getShow(
       show,
     });
   } catch (error) {
-    console.error(
-      "Get show error:",
-      error
-    );
+    console.error("Get show error:", error);
 
     res.status(500).json({
       success: false,
@@ -796,15 +771,9 @@ export async function getShowsByMovie(
   res: Response
 ): Promise<void> {
   try {
-    const movieId = String(
-      req.params.movieId
-    );
+    const movieId = String(req.params.movieId);
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        movieId
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(movieId)) {
       res.status(400).json({
         success: false,
         message: "Invalid movie ID",
@@ -812,8 +781,7 @@ export async function getShowsByMovie(
       return;
     }
 
-    const movieExists =
-      await Movie.findById(movieId);
+    const movieExists = await Movie.findById(movieId);
 
     if (!movieExists) {
       res.status(404).json({
@@ -824,29 +792,13 @@ export async function getShowsByMovie(
     }
 
     const shows = await Show.find({
-      movie:
-        new mongoose.Types.ObjectId(
-          movieId
-        ),
-      startTime: {
-        $gte: new Date(),
-      },
+      movie: new mongoose.Types.ObjectId(movieId),
+      startTime: { $gte: new Date() },
     })
-      .populate(
-        "movie",
-        "title posterPath tmdbId runtime"
-      )
-      .populate(
-        "theatre",
-        "name address city state pincode"
-      )
-      .populate(
-        "screen",
-        "name totalSeats"
-      )
-      .sort({
-        startTime: 1,
-      });
+      .populate("movie", "title posterPath tmdbId runtime")
+      .populate("theatre", "name address city state pincode")
+      .populate("screen", "name totalSeats")
+      .sort({ startTime: 1 });
 
     res.json({
       success: true,
@@ -854,15 +806,11 @@ export async function getShowsByMovie(
       shows,
     });
   } catch (error) {
-    console.error(
-      "Get movie shows error:",
-      error
-    );
+    console.error("Get movie shows error:", error);
 
     res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch movie shows",
+      message: "Failed to fetch movie shows",
     });
   }
 }
@@ -872,15 +820,9 @@ export async function getShowsByTheatre(
   res: Response
 ): Promise<void> {
   try {
-    const theatreId = String(
-      req.params.theatreId
-    );
+    const theatreId = String(req.params.theatreId);
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        theatreId
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(theatreId)) {
       res.status(400).json({
         success: false,
         message: "Invalid theatre ID",
@@ -888,10 +830,7 @@ export async function getShowsByTheatre(
       return;
     }
 
-    const theatreExists =
-      await Theatre.findById(
-        theatreId
-      );
+    const theatreExists = await Theatre.findById(theatreId);
 
     if (!theatreExists) {
       res.status(404).json({
@@ -902,29 +841,13 @@ export async function getShowsByTheatre(
     }
 
     const shows = await Show.find({
-      theatre:
-        new mongoose.Types.ObjectId(
-          theatreId
-        ),
-      startTime: {
-        $gte: new Date(),
-      },
+      theatre: new mongoose.Types.ObjectId(theatreId),
+      startTime: { $gte: new Date() },
     })
-      .populate(
-        "movie",
-        "title posterPath tmdbId runtime"
-      )
-      .populate(
-        "theatre",
-        "name address city state pincode"
-      )
-      .populate(
-        "screen",
-        "name totalSeats"
-      )
-      .sort({
-        startTime: 1,
-      });
+      .populate("movie", "title posterPath tmdbId runtime")
+      .populate("theatre", "name address city state pincode")
+      .populate("screen", "name totalSeats")
+      .sort({ startTime: 1 });
 
     res.json({
       success: true,
@@ -932,15 +855,11 @@ export async function getShowsByTheatre(
       shows,
     });
   } catch (error) {
-    console.error(
-      "Get theatre shows error:",
-      error
-    );
+    console.error("Get theatre shows error:", error);
 
     res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch theatre shows",
+      message: "Failed to fetch theatre shows",
     });
   }
 }
@@ -950,15 +869,9 @@ export async function updateShow(
   res: Response
 ): Promise<void> {
   try {
-    const showId = String(
-      req.params.id
-    );
+    const showId = String(req.params.id);
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        showId
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(showId)) {
       res.status(400).json({
         success: false,
         message: "Invalid show ID",
@@ -966,8 +879,7 @@ export async function updateShow(
       return;
     }
 
-    const existingShow =
-      await Show.findById(showId);
+    const existingShow = await Show.findById(showId);
 
     if (!existingShow) {
       res.status(404).json({
@@ -985,7 +897,9 @@ export async function updateShow(
       endTime,
       language,
       format,
-      price,
+      balconyPrice,
+      firstClassPrice,
+      secondClassPrice,
     } = req.body;
 
     const updateData: {
@@ -997,16 +911,15 @@ export async function updateShow(
       language?: string;
       format?: ShowFormat;
       price?: number;
+      balconyPrice?: number;
+      firstClassPrice?: number;
+      secondClassPrice?: number;
     } = {};
 
     if (movie !== undefined) {
       const movieId = String(movie);
 
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          movieId
-        )
-      ) {
+      if (!mongoose.Types.ObjectId.isValid(movieId)) {
         res.status(400).json({
           success: false,
           message: "Invalid movie ID",
@@ -1014,8 +927,7 @@ export async function updateShow(
         return;
       }
 
-      const movieExists =
-        await Movie.findById(movieId);
+      const movieExists = await Movie.findById(movieId);
 
       if (!movieExists) {
         res.status(404).json({
@@ -1025,22 +937,13 @@ export async function updateShow(
         return;
       }
 
-      updateData.movie =
-        new mongoose.Types.ObjectId(
-          movieId
-        );
+      updateData.movie = new mongoose.Types.ObjectId(movieId);
     }
 
     if (theatre !== undefined) {
-      const theatreId = String(
-        theatre
-      );
+      const theatreId = String(theatre);
 
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          theatreId
-        )
-      ) {
+      if (!mongoose.Types.ObjectId.isValid(theatreId)) {
         res.status(400).json({
           success: false,
           message: "Invalid theatre ID",
@@ -1048,10 +951,7 @@ export async function updateShow(
         return;
       }
 
-      const theatreExists =
-        await Theatre.findById(
-          theatreId
-        );
+      const theatreExists = await Theatre.findById(theatreId);
 
       if (!theatreExists) {
         res.status(404).json({
@@ -1061,20 +961,13 @@ export async function updateShow(
         return;
       }
 
-      updateData.theatre =
-        new mongoose.Types.ObjectId(
-          theatreId
-        );
+      updateData.theatre = new mongoose.Types.ObjectId(theatreId);
     }
 
     if (screen !== undefined) {
       const screenId = String(screen);
 
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          screenId
-        )
-      ) {
+      if (!mongoose.Types.ObjectId.isValid(screenId)) {
         res.status(400).json({
           success: false,
           message: "Invalid screen ID",
@@ -1082,8 +975,7 @@ export async function updateShow(
         return;
       }
 
-      const screenExists =
-        await Screen.findById(screenId);
+      const screenExists = await Screen.findById(screenId);
 
       if (!screenExists) {
         res.status(404).json({
@@ -1093,81 +985,77 @@ export async function updateShow(
         return;
       }
 
-      updateData.screen =
-        new mongoose.Types.ObjectId(
-          screenId
-        );
+      updateData.screen = new mongoose.Types.ObjectId(screenId);
     }
 
     if (language !== undefined) {
-      const trimmedLanguage =
-        String(language).trim();
+      const normalizedLanguage = String(language).trim();
 
-      if (!trimmedLanguage) {
+      if (!normalizedLanguage) {
         res.status(400).json({
           success: false,
-          message:
-            "Language cannot be empty",
+          message: "Language cannot be empty",
         });
         return;
       }
 
-      updateData.language =
-        trimmedLanguage;
+      updateData.language = normalizedLanguage;
     }
 
     if (format !== undefined) {
-      const normalizedFormat =
-        String(format).toUpperCase();
+      const normalizedFormat = normalizeFormat(format);
 
-      if (
-        normalizedFormat !== "2D" &&
-        normalizedFormat !== "3D" &&
-        normalizedFormat !== "IMAX"
-      ) {
+      if (!normalizedFormat) {
         res.status(400).json({
           success: false,
-          message:
-            "Format must be 2D, 3D or IMAX",
+          message: "Format must be 2D, 3D or IMAX",
         });
         return;
       }
 
-      updateData.format =
-        normalizedFormat as ShowFormat;
+      updateData.format = normalizedFormat;
     }
 
-    if (price !== undefined) {
-      const showPrice = Number(price);
+    const hasAnyPrice =
+      balconyPrice !== undefined ||
+      firstClassPrice !== undefined ||
+      secondClassPrice !== undefined;
 
-      if (
-        !Number.isFinite(showPrice) ||
-        showPrice < 0
-      ) {
+    if (hasAnyPrice) {
+      const prices = validatePrices(
+        balconyPrice !== undefined
+          ? balconyPrice
+          : existingShow.balconyPrice,
+        firstClassPrice !== undefined
+          ? firstClassPrice
+          : existingShow.firstClassPrice,
+        secondClassPrice !== undefined
+          ? secondClassPrice
+          : existingShow.secondClassPrice
+      );
+
+      if (!prices) {
         res.status(400).json({
           success: false,
           message:
-            "Price must be a valid non-negative number",
+            "Valid non-negative prices for all three classes are required",
         });
         return;
       }
 
-      updateData.price = showPrice;
+      updateData.balconyPrice = prices.balconyPrice;
+      updateData.firstClassPrice = prices.firstClassPrice;
+      updateData.secondClassPrice = prices.secondClassPrice;
+      updateData.price = prices.secondClassPrice;
     }
 
     if (startTime !== undefined) {
-      const start =
-        new Date(startTime);
+      const start = new Date(startTime);
 
-      if (
-        Number.isNaN(
-          start.getTime()
-        )
-      ) {
+      if (Number.isNaN(start.getTime())) {
         res.status(400).json({
           success: false,
-          message:
-            "Invalid startTime",
+          message: "Invalid startTime",
         });
         return;
       }
@@ -1176,18 +1064,12 @@ export async function updateShow(
     }
 
     if (endTime !== undefined) {
-      const end =
-        new Date(endTime);
+      const end = new Date(endTime);
 
-      if (
-        Number.isNaN(
-          end.getTime()
-        )
-      ) {
+      if (Number.isNaN(end.getTime())) {
         res.status(400).json({
           success: false,
-          message:
-            "Invalid endTime",
+          message: "Invalid endTime",
         });
         return;
       }
@@ -1195,14 +1077,10 @@ export async function updateShow(
       updateData.endTime = end;
     }
 
-    if (
-      Object.keys(updateData).length ===
-      0
-    ) {
+    if (Object.keys(updateData).length === 0) {
       res.status(400).json({
         success: false,
-        message:
-          "No fields provided for update",
+        message: "No fields provided for update",
       });
       return;
     }
@@ -1220,8 +1098,7 @@ export async function updateShow(
     if (finalEnd <= finalStart) {
       res.status(400).json({
         success: false,
-        message:
-          "End time must be after start time",
+        message: "End time must be after start time",
       });
       return;
     }
@@ -1236,10 +1113,7 @@ export async function updateShow(
         ? updateData.screen.toString()
         : existingShow.screen.toString();
 
-    const finalScreen =
-      await Screen.findById(
-        finalScreenId
-      );
+    const finalScreen = await Screen.findById(finalScreenId);
 
     if (!finalScreen) {
       res.status(404).json({
@@ -1249,37 +1123,20 @@ export async function updateShow(
       return;
     }
 
-    if (
-      finalScreen.theatre.toString() !==
-      finalTheatreId
-    ) {
+    if (finalScreen.theatre.toString() !== finalTheatreId) {
       res.status(400).json({
         success: false,
-        message:
-          "Screen does not belong to the selected theatre",
+        message: "Screen does not belong to the selected theatre",
       });
       return;
     }
 
-    const conflictingShow =
-      await Show.findOne({
-        _id: {
-          $ne:
-            new mongoose.Types.ObjectId(
-              showId
-            ),
-        },
-        screen:
-          new mongoose.Types.ObjectId(
-            finalScreenId
-          ),
-        startTime: {
-          $lt: finalEnd,
-        },
-        endTime: {
-          $gt: finalStart,
-        },
-      });
+    const conflictingShow = await findScheduleConflict(
+      finalScreenId,
+      finalStart,
+      finalEnd,
+      showId
+    );
 
     if (conflictingShow) {
       res.status(409).json({
@@ -1288,24 +1145,21 @@ export async function updateShow(
           "Another show is already scheduled on this screen during this time",
         conflictingShow: {
           id: conflictingShow._id.toString(),
-          startTime:
-            conflictingShow.startTime,
-          endTime:
-            conflictingShow.endTime,
+          startTime: conflictingShow.startTime,
+          endTime: conflictingShow.endTime,
         },
       });
       return;
     }
 
-    const updatedShow =
-      await Show.findByIdAndUpdate(
-        showId,
-        updateData,
-        {
-          returnDocument: "after",
-          runValidators: true,
-        }
-      );
+    const updatedShow = await Show.findByIdAndUpdate(
+      showId,
+      updateData,
+      {
+        returnDocument: "after",
+        runValidators: true,
+      }
+    );
 
     if (!updatedShow) {
       res.status(404).json({
@@ -1315,39 +1169,22 @@ export async function updateShow(
       return;
     }
 
-    const populatedShow =
-      await Show.findById(
-        updatedShow._id
-      )
-        .populate(
-          "movie",
-          "title posterPath tmdbId runtime"
-        )
-        .populate(
-          "theatre",
-          "name address city state pincode"
-        )
-        .populate(
-          "screen",
-          "name totalSeats"
-        );
+    const populatedShow = await Show.findById(updatedShow._id)
+      .populate("movie", "title posterPath tmdbId runtime")
+      .populate("theatre", "name address city state pincode")
+      .populate("screen", "name totalSeats");
 
     res.json({
       success: true,
-      message:
-        "Show updated successfully",
+      message: "Show updated successfully",
       show: populatedShow,
     });
   } catch (error) {
-    console.error(
-      "Update show error:",
-      error
-    );
+    console.error("Update show error:", error);
 
     res.status(500).json({
       success: false,
-      message:
-        "Failed to update show",
+      message: "Failed to update show",
     });
   }
 }
@@ -1357,15 +1194,9 @@ export async function deleteShow(
   res: Response
 ): Promise<void> {
   try {
-    const showId = String(
-      req.params.id
-    );
+    const showId = String(req.params.id);
 
-    if (
-      !mongoose.Types.ObjectId.isValid(
-        showId
-      )
-    ) {
+    if (!mongoose.Types.ObjectId.isValid(showId)) {
       res.status(400).json({
         success: false,
         message: "Invalid show ID",
@@ -1373,14 +1204,7 @@ export async function deleteShow(
       return;
     }
 
-    await ShowSeat.deleteMany({
-      show: showId,
-    });
-
-    const show =
-      await Show.findByIdAndDelete(
-        showId
-      );
+    const show = await Show.findById(showId);
 
     if (!show) {
       res.status(404).json({
@@ -1390,21 +1214,34 @@ export async function deleteShow(
       return;
     }
 
+    const session = await mongoose.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        await ShowSeat.deleteMany(
+          { show: showId },
+          { session }
+        );
+
+        await Show.deleteOne(
+          { _id: showId },
+          { session }
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+
     res.json({
       success: true,
-      message:
-        "Show deleted successfully",
+      message: "Show deleted successfully",
     });
   } catch (error) {
-    console.error(
-      "Delete show error:",
-      error
-    );
+    console.error("Delete show error:", error);
 
     res.status(500).json({
       success: false,
-      message:
-        "Failed to delete show",
+      message: "Failed to delete show",
     });
   }
 }

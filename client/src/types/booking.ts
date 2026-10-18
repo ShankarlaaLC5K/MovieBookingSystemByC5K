@@ -28,30 +28,24 @@ export interface BookingScreen {
 
 export interface BookingShow {
   _id: string;
-  movie:
-    | string
-    | BookingMovie;
-  theatre:
-    | string
-    | BookingTheatre;
-  screen:
-    | string
-    | BookingScreen;
+  movie: string | BookingMovie;
+  theatre: string | BookingTheatre;
+  screen: string | BookingScreen;
   startTime: string;
   endTime: string;
   language?: string;
   format?: "2D" | "3D" | "IMAX";
   price?: number;
+  secondClassPrice?: number;
+  firstClassPrice?: number;
+  balconyPrice?: number;
 }
 
 export interface BookingSeat {
   _id: string;
   row: string;
   number: number;
-  type?:
-    | "regular"
-    | "premium"
-    | "recliner";
+  type?: "regular" | "premium" | "recliner";
   price?: number;
 }
 
@@ -66,16 +60,15 @@ export interface Booking {
         email?: string;
       };
 
-  show:
-    | string
-    | BookingShow;
+  show: string | BookingShow;
 
-  seats: (
-    | string
-    | BookingSeat
-  )[];
+  seats: (string | BookingSeat)[];
 
   totalAmount: number;
+
+  ticketSubtotal?: number;
+  platformFee?: number;
+  platformFeeGst?: number;
 
   status:
     | "pending"
@@ -87,7 +80,6 @@ export interface Booking {
   bookingReference?: string;
 
   createdAt?: string;
-
   updatedAt?: string;
 }
 

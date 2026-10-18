@@ -2,30 +2,28 @@ import { Router } from "express";
 
 import {
   createPaymentOrder,
+  createReschedulePaymentOrder,
   verifyPayment,
   mockPaymentSuccess,
+  mockReschedulePaymentSuccess,
 } from "../controllers/paymentController";
 
 import { protect } from "../middleware/authMiddleware";
 
 const router = Router();
 
+router.post("/create-order", protect, createPaymentOrder);
 router.post(
-  "/create-order",
+  "/reschedule-create-order",
   protect,
-  createPaymentOrder
+  createReschedulePaymentOrder
 );
-
+router.post("/verify", protect, verifyPayment);
+router.post("/mock-success", protect, mockPaymentSuccess);
 router.post(
-  "/verify",
+  "/mock-reschedule-success",
   protect,
-  verifyPayment
-);
-
-router.post(
-  "/mock-success",
-  protect,
-  mockPaymentSuccess
+  mockReschedulePaymentSuccess
 );
 
 export default router;

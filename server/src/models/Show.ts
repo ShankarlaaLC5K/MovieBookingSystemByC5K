@@ -1,3 +1,4 @@
+
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IShow extends Document {
@@ -9,6 +10,9 @@ export interface IShow extends Document {
   language: string;
   format: "2D" | "3D" | "IMAX";
   price: number;
+  balconyPrice: number;
+  firstClassPrice: number;
+  secondClassPrice: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,42 +24,50 @@ const showSchema = new Schema<IShow>(
       ref: "Movie",
       required: true,
     },
-
     theatre: {
       type: Schema.Types.ObjectId,
       ref: "Theatre",
       required: true,
     },
-
     screen: {
       type: Schema.Types.ObjectId,
       ref: "Screen",
       required: true,
     },
-
     startTime: {
       type: Date,
       required: true,
     },
-
     endTime: {
       type: Date,
       required: true,
     },
-
     language: {
       type: String,
       required: true,
       trim: true,
     },
-
     format: {
       type: String,
       enum: ["2D", "3D", "IMAX"],
       default: "2D",
     },
-
     price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    balconyPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    firstClassPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    secondClassPrice: {
       type: Number,
       required: true,
       min: 0,
@@ -66,7 +78,4 @@ const showSchema = new Schema<IShow>(
   }
 );
 
-export const Show = mongoose.model<IShow>(
-  "Show",
-  showSchema
-);
+export const Show = mongoose.model<IShow>("Show", showSchema);

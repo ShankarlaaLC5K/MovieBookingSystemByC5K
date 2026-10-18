@@ -507,3 +507,61 @@ Movie Booking System
       ),
   });
 }
+
+
+export async function sendBookingReminderEmail(
+  data: BookingEmailData
+): Promise<void> {
+  const transporter = getTransporter();
+
+  await transporter.sendMail({
+    from: getSenderEmail(),
+    to: data.to,
+    subject: `Reminder: Upcoming movie show - ${data.bookingReference}`,
+    text: `
+Your movie show is coming up!
+
+Booking Reference: ${data.bookingReference}
+Movie: ${data.movieName}
+Theatre: ${data.theatreName}
+Screen: ${data.screenName}
+Date: ${data.showDate}
+Time: ${data.showTime}
+Seats: ${data.seats.join(", ")}
+
+Please arrive at the theatre on time.
+
+Movie Booking System
+    `.trim(),
+    html: createEmailHtml(data, "confirmed"),
+  });
+}
+
+export async function sendShowtimeChangedEmail(
+  data: BookingEmailData,
+  previousShowTime: string
+): Promise<void> {
+  const transporter = getTransporter();
+
+  await transporter.sendMail({
+    from: getSenderEmail(),
+    to: data.to,
+    subject: `Important: Showtime changed - ${data.bookingReference}`,
+    text: `
+Your movie showtime has changed.
+
+Booking Reference: ${data.bookingReference}
+Movie: ${data.movieName}
+Theatre: ${data.theatreName}
+Screen: ${data.screenName}
+Previous Showtime: ${previousShowTime}
+New Date: ${data.showDate}
+New Showtime: ${data.showTime}
+Seats: ${data.seats.join(", ")}
+
+Please check your updated booking details before travelling.
+
+Movie Booking System
+    `.trim(),
+  });
+}

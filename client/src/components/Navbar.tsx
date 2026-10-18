@@ -8,6 +8,7 @@ import {
   X,
   Sun,
   Moon,
+  Wallet,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -15,11 +16,8 @@ import { useTheme } from "../context/ThemeContext";
 
 function Navbar() {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } =
-    useTheme();
-
-  const [mobileMenuOpen, setMobileMenuOpen] =
-    useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
@@ -30,35 +28,30 @@ function Navbar() {
     logout();
   };
 
+  const linkClass =
+    "text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white";
+
+  const mobileLinkClass =
+    "rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white";
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
       <nav className="mx-auto max-w-7xl px-4">
         <div className="flex items-center justify-between py-4">
-
           <Link
             to="/"
             onClick={closeMobileMenu}
             className="text-2xl font-bold text-slate-900 dark:text-white"
           >
-            New
-            <span className="text-red-500">
-              Ticket
-            </span>
+            New<span className="text-red-500">Ticket</span>
           </Link>
 
           <div className="hidden items-center gap-5 lg:flex">
-
-            <Link
-              to="/"
-              className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-            >
+            <Link to="/" className={linkClass}>
               Home
             </Link>
 
-            <Link
-              to="/movies"
-              className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-            >
+            <Link to="/movies" className={linkClass}>
               Movies
             </Link>
 
@@ -72,11 +65,16 @@ function Navbar() {
 
             {user && (
               <>
-                <Link
-                  to="/bookings"
-                  className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-                >
+                <Link to="/bookings" className={linkClass}>
                   My Bookings
+                </Link>
+
+                <Link
+                  to="/wallet"
+                  className="inline-flex items-center gap-1.5 text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+                >
+                  <Wallet size={16} />
+                  Wallet
                 </Link>
 
                 <Link
@@ -88,12 +86,9 @@ function Navbar() {
                 </Link>
 
                 {user.role === "admin" && (
-                <Link
-                  to="/admin"
-                  className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-                >
-                  Admin
-                </Link>
+                  <Link to="/admin" className={linkClass}>
+                    Admin
+                  </Link>
                 )}
 
                 <span className="text-sm text-slate-600 dark:text-slate-400">
@@ -102,7 +97,7 @@ function Navbar() {
 
                 <button
                   type="button"
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition hover:bg-red-700"
                 >
                   <LogOut size={16} />
@@ -113,10 +108,7 @@ function Navbar() {
 
             {!user && (
               <>
-                <Link
-                  to="/login"
-                  className="text-slate-700 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-                >
+                <Link to="/login" className={linkClass}>
                   Login
                 </Link>
 
@@ -137,30 +129,17 @@ function Navbar() {
                   ? "Switch to light mode"
                   : "Switch to dark mode"
               }
-              title={
-                theme === "dark"
-                  ? "Light mode"
-                  : "Dark mode"
-              }
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
             >
               {theme === "dark" ? (
-                <Moon
-                  size={20}
-                  strokeWidth={2.5}
-                />
+                <Moon size={20} strokeWidth={2.5} />
               ) : (
-                <Sun
-                  size={20}
-                  strokeWidth={2.5}
-                />
+                <Sun size={20} strokeWidth={2.5} />
               )}
             </button>
-
           </div>
 
           <div className="flex items-center gap-2 lg:hidden">
-
             <button
               type="button"
               onClick={toggleTheme}
@@ -169,62 +148,37 @@ function Navbar() {
                   ? "Switch to light mode"
                   : "Switch to dark mode"
               }
-              title={
-                theme === "dark"
-                  ? "Light mode"
-                  : "Dark mode"
-              }
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-white dark:hover:bg-slate-800"
             >
               {theme === "dark" ? (
-                <Moon
-                  size={20}
-                  strokeWidth={2.5}
-                />
+                <Moon size={20} strokeWidth={2.5} />
               ) : (
-                <Sun
-                  size={20}
-                  strokeWidth={2.5}
-                />
+                <Sun size={20} strokeWidth={2.5} />
               )}
             </button>
 
             <button
               type="button"
-              onClick={() =>
-                setMobileMenuOpen(
-                  (current) => !current
-                )
-              }
+              onClick={() => setMobileMenuOpen((current) => !current)}
               aria-label="Toggle navigation menu"
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
             >
-              {mobileMenuOpen ? (
-                <X size={22} />
-              ) : (
-                <Menu size={22} />
-              )}
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
-
           </div>
         </div>
 
         {mobileMenuOpen && (
           <div className="border-t border-slate-200 py-4 dark:border-slate-800 lg:hidden">
             <div className="flex flex-col gap-2">
-
-              <Link
-                to="/"
-                onClick={closeMobileMenu}
-                className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
-              >
+              <Link to="/" onClick={closeMobileMenu} className={mobileLinkClass}>
                 Home
               </Link>
 
               <Link
                 to="/movies"
                 onClick={closeMobileMenu}
-                className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+                className={mobileLinkClass}
               >
                 Movies
               </Link>
@@ -232,9 +186,8 @@ function Navbar() {
               <Link
                 to="/movies"
                 onClick={closeMobileMenu}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+                className={mobileLinkClass}
               >
-                <MapPin size={18} />
                 Near You
               </Link>
 
@@ -243,56 +196,58 @@ function Navbar() {
                   <Link
                     to="/bookings"
                     onClick={closeMobileMenu}
-                    className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+                    className={mobileLinkClass}
                   >
                     My Bookings
                   </Link>
 
                   <Link
+                    to="/wallet"
+                    onClick={closeMobileMenu}
+                    className={mobileLinkClass}
+                  >
+                    Wallet
+                  </Link>
+
+                  <Link
                     to="/profile"
                     onClick={closeMobileMenu}
-                    className="inline-flex items-center gap-2 rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+                    className={mobileLinkClass}
                   >
-                    <User size={18} />
                     Profile
                   </Link>
 
                   {user.role === "admin" && (
-                  <Link
-                    to="/admin"
-                    onClick={closeMobileMenu}
-                    className="rounded-lg px-4 py-3 text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
-                  >
-                    Admin
-                  </Link>
+                    <Link
+                      to="/admin"
+                      onClick={closeMobileMenu}
+                      className={mobileLinkClass}
+                    >
+                      Admin
+                    </Link>
                   )}
 
-                  <div className="border-t border-slate-200 pt-3 dark:border-slate-800">
-
-                    <p className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400">
-                      Hi, {user.name}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="inline-flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left font-medium text-red-500 transition hover:bg-red-500/10"
-                    >
-                      <LogOut size={18} />
-                      Logout
-                    </button>
-
+                  <div className="px-4 py-2 text-sm text-slate-500">
+                    Hi, {user.name}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="mx-4 inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 font-medium text-white transition hover:bg-red-700"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
                 </>
               )}
 
               {!user && (
-                <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-
+                <>
                   <Link
                     to="/login"
                     onClick={closeMobileMenu}
-                    className="rounded-lg border border-slate-300 px-4 py-3 text-center text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white"
+                    className={mobileLinkClass}
                   >
                     Login
                   </Link>
@@ -300,14 +255,12 @@ function Navbar() {
                   <Link
                     to="/register"
                     onClick={closeMobileMenu}
-                    className="rounded-lg bg-red-600 px-4 py-3 text-center font-medium text-white transition hover:bg-red-700"
+                    className={mobileLinkClass}
                   >
                     Register
                   </Link>
-
-                </div>
+                </>
               )}
-
             </div>
           </div>
         )}

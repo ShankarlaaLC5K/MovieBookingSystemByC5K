@@ -1,3 +1,4 @@
+
 export type ShowFormat = "2D" | "3D" | "IMAX";
 
 export interface ShowMovie {
@@ -24,22 +25,17 @@ export interface ShowScreen {
 
 export interface Show {
   _id: string;
-
   movie: ShowMovie;
-
   theatre: ShowTheatre;
-
   screen: ShowScreen;
-
   startTime: string;
   endTime: string;
-
   language: string;
-
   format: ShowFormat;
-
   price: number;
-
+  balconyPrice?: number;
+  firstClassPrice?: number;
+  secondClassPrice?: number;
   createdAt?: string;
   updatedAt?: string;
 }

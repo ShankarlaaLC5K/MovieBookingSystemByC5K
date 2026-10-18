@@ -1,13 +1,14 @@
 
 export type UserRole = "user" | "admin";
 
-export type RegistrationRole = "user" ;
+export type RegistrationRole = "user";
 
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
+  walletBalance?: number;
 }
 
 export interface LoginData {

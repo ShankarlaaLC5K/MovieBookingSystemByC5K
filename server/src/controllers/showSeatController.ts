@@ -8,32 +8,40 @@ import { AuthRequest } from "../middleware/authMiddleware";
 
 const LOCK_DURATION_MINUTES = 10;
 
+
+async function releaseExpiredLocks(showId: string): Promise<void> {
+  await ShowSeat.updateMany(
+    {
+      show: showId,
+      status: "locked",
+      lockedUntil: { $lte: new Date() },
+    },
+    {
+      $set: { status: "available" },
+      $unset: {
+        lockedUntil: 1,
+        lockedBy: 1,
+      },
+    }
+  );
+}
+
 export async function initializeShowSeats(
   req: Request,
   res: Response
 ): Promise<void> {
   try {
-    const { show: showId } = req.body;
+    const showId = String(req.body.show ?? "");
 
-    if (!showId) {
+    if (!mongoose.Types.ObjectId.isValid(showId)) {
       res.status(400).json({
         success: false,
-        message: "Show ID is required",
+        message: "A valid show ID is required",
       });
       return;
     }
 
-    const showIdString = String(showId);
-
-    if (!mongoose.Types.ObjectId.isValid(showIdString)) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid show ID",
-      });
-      return;
-    }
-
-    const show = await Show.findById(showIdString);
+    const show = await Show.findById(showId);
 
     if (!show) {
       res.status(404).json({
@@ -44,7 +52,7 @@ export async function initializeShowSeats(
     }
 
     const existingCount = await ShowSeat.countDocuments({
-      show: showIdString,
+      show: showId,
     });
 
     if (existingCount > 0) {
@@ -58,10 +66,7 @@ export async function initializeShowSeats(
 
     const seats = await Seat.find({
       screen: show.screen,
-    }).sort({
-      row: 1,
-      number: 1,
-    });
+    }).sort({ row: 1, number: 1 });
 
     if (seats.length === 0) {
       res.status(404).json({
@@ -77,8 +82,10 @@ export async function initializeShowSeats(
       status: "available" as const,
     }));
 
-    const createdShowSeats =
-      await ShowSeat.insertMany(showSeats);
+    const createdShowSeats = await ShowSeat.insertMany(
+      showSeats,
+      { ordered: true }
+    );
 
     res.status(201).json({
       success: true,
@@ -86,10 +93,18 @@ export async function initializeShowSeats(
       count: createdShowSeats.length,
     });
   } catch (error) {
-    console.error(
-      "Initialize show seats error:",
-      error
-    );
+    console.error("Initialize show seats error:", error);
+
+    if (
+      error instanceof mongoose.mongo.MongoServerError &&
+      error.code === 11000
+    ) {
+      res.status(409).json({
+        success: false,
+        message: "Show seats have already been initialized",
+      });
+      return;
+    }
 
     res.status(500).json({
       success: false,
@@ -103,7 +118,7 @@ export async function getShowSeats(
   res: Response
 ): Promise<void> {
   try {
-    const showId = String(req.params.showId);
+    const showId = String(req.params.showId ?? "");
 
     if (!mongoose.Types.ObjectId.isValid(showId)) {
       res.status(400).json({
@@ -123,51 +138,20 @@ export async function getShowSeats(
       return;
     }
 
-    await ShowSeat.updateMany(
-      {
-        show: showId,
-        status: "locked",
-        lockedUntil: {
-          $lte: new Date(),
-        },
-      },
-      {
-        $set: {
-          status: "available",
-        },
-        $unset: {
-          lockedUntil: 1,
-          lockedBy: 1,
-        },
-      }
-    );
+    await releaseExpiredLocks(showId);
 
-    const showSeats = await ShowSeat.find({
-      show: showId,
-    })
-      .populate(
-        "seat",
-        "row number type price"
-      )
-      .populate(
-        "lockedBy",
-        "name email"
-      )
-      .sort({
-        "seat.row": 1,
-        "seat.number": 1,
-      });
+    const showSeats = await ShowSeat.find({ show: showId })
+      .populate("seat", "row number type price")
+      .populate("lockedBy", "name email")
+      .sort({ createdAt: 1 });
 
-    res.json({
+    res.status(200).json({
       success: true,
       count: showSeats.length,
       seats: showSeats,
     });
   } catch (error) {
-    console.error(
-      "Get show seats error:",
-      error
-    );
+    console.error("Get show seats error:", error);
 
     res.status(500).json({
       success: false,
@@ -180,51 +164,54 @@ export async function lockShowSeats(
   req: AuthRequest,
   res: Response
 ): Promise<void> {
-  try {
-    if (!req.userId) {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
-      return;
-    }
+  const userIdValue = req.userId;
 
-    const showId = String(req.params.showId);
-    const { seatIds } = req.body;
+  if (!userIdValue || !mongoose.Types.ObjectId.isValid(userIdValue)) {
+    res.status(401).json({
+      success: false,
+      message: "Authentication required",
+    });
+    return;
+  }
 
-    if (!mongoose.Types.ObjectId.isValid(showId)) {
-      res.status(400).json({
-        success: false,
-        message: "Invalid show ID",
-      });
-      return;
-    }
+  const showId = String(req.params.showId ?? "");
+  const { seatIds } = req.body;
 
-    if (!Array.isArray(seatIds) || seatIds.length === 0) {
-      res.status(400).json({
-        success: false,
-        message:
-          "seatIds must be a non-empty array",
-      });
-      return;
-    }
+  if (!mongoose.Types.ObjectId.isValid(showId)) {
+    res.status(400).json({
+      success: false,
+      message: "Invalid show ID",
+    });
+    return;
+  }
 
-    const uniqueSeatIds = [
-      ...new Set(seatIds.map(String)),
-    ];
-
-    for (const seatId of uniqueSeatIds) {
-      if (
+  if (
+    !Array.isArray(seatIds) ||
+    seatIds.length === 0 ||
+    seatIds.some(
+      (seatId: unknown) =>
+        typeof seatId !== "string" ||
         !mongoose.Types.ObjectId.isValid(seatId)
-      ) {
-        res.status(400).json({
-          success: false,
-          message: `Invalid seat ID: ${seatId}`,
-        });
-        return;
-      }
-    }
+    )
+  ) {
+    res.status(400).json({
+      success: false,
+      message: "seatIds must be a non-empty array of valid seat IDs",
+    });
+    return;
+  }
 
+  const uniqueSeatIds = [...new Set(seatIds as string[])];
+
+  if (uniqueSeatIds.length !== seatIds.length) {
+    res.status(400).json({
+      success: false,
+      message: "Duplicate seat IDs are not allowed",
+    });
+    return;
+  }
+
+  try {
     const show = await Show.findById(showId);
 
     if (!show) {
@@ -235,141 +222,119 @@ export async function lockShowSeats(
       return;
     }
 
-    await ShowSeat.updateMany(
-      {
-        show: showId,
-        status: "locked",
-        lockedUntil: {
-          $lte: new Date(),
-        },
-      },
-      {
-        $set: {
-          status: "available",
-        },
-        $unset: {
-          lockedUntil: 1,
-          lockedBy: 1,
-        },
-      }
-    );
+    await releaseExpiredLocks(showId);
 
-    const showSeats = await ShowSeat.find({
+    const requestedSeats = await ShowSeat.find({
       show: showId,
-      seat: {
-        $in: uniqueSeatIds,
-      },
+      seat: { $in: uniqueSeatIds },
     });
 
-    if (
-      showSeats.length !==
-      uniqueSeatIds.length
-    ) {
+    if (requestedSeats.length !== uniqueSeatIds.length) {
       res.status(400).json({
         success: false,
-        message:
-          "One or more seats do not belong to this show",
+        message: "One or more seats do not belong to this show",
       });
       return;
     }
 
-    const unavailableSeats =
-      showSeats.filter(
-        (showSeat) =>
-          showSeat.status !== "available"
-      );
+    const userId = new mongoose.Types.ObjectId(userIdValue);
+
+    const unavailableSeats = requestedSeats.filter(
+      (showSeat) =>
+        showSeat.status === "booked" ||
+        (showSeat.status === "locked" &&
+          String(showSeat.lockedBy) !== String(userId))
+    );
 
     if (unavailableSeats.length > 0) {
       res.status(409).json({
         success: false,
-        message:
-          "One or more selected seats are unavailable",
-        unavailableSeatIds:
-          unavailableSeats.map(
-            (showSeat) =>
-              showSeat.seat.toString()
-          ),
+        message: "One or more selected seats are unavailable",
+        unavailableSeatIds: unavailableSeats.map((showSeat) =>
+          String(showSeat.seat)
+        ),
       });
       return;
     }
 
     const lockedUntil = new Date(
-      Date.now() +
-        LOCK_DURATION_MINUTES *
-          60 *
-          1000
+      Date.now() + LOCK_DURATION_MINUTES * 60 * 1000
     );
 
-    const userId = new mongoose.Types.ObjectId(
-      req.userId
-    );
 
     const lockedSeats = [];
 
     for (const seatId of uniqueSeatIds) {
-      const lockedSeat =
-        await ShowSeat.findOneAndUpdate(
-          {
-            show: showId,
-            seat: seatId,
-            status: "available",
-          },
-          {
-            $set: {
+      const lockedSeat = await ShowSeat.findOneAndUpdate(
+        {
+          show: showId,
+          seat: seatId,
+          $or: [
+            { status: "available" },
+            {
               status: "locked",
-              lockedUntil,
               lockedBy: userId,
+              lockedUntil: { $gt: new Date() },
             },
-          },
-          {
-             returnDocument: "after",
-          }
-        );
-
-      if (!lockedSeat) {
-        await ShowSeat.updateMany(
-          {
-            show: showId,
-            seat: {
-              $in: uniqueSeatIds,
-            },
+          ],
+        },
+        {
+          $set: {
             status: "locked",
+            lockedUntil,
             lockedBy: userId,
           },
-          {
-            $set: {
-              status: "available",
+        },
+        { new: true }
+      );
+
+      if (!lockedSeat) {
+
+        const acquiredSeatIds = lockedSeats
+          .filter((seat) => !requestedSeats.some(
+            (original) =>
+              String(original.seat) === String(seat.seat) &&
+              original.status === "locked" &&
+              String(original.lockedBy) === String(userId)
+          ))
+          .map((seat) => seat.seat);
+
+        if (acquiredSeatIds.length > 0) {
+          await ShowSeat.updateMany(
+            {
+              show: showId,
+              seat: { $in: acquiredSeatIds },
+              status: "locked",
+              lockedBy: userId,
             },
-            $unset: {
-              lockedUntil: 1,
-              lockedBy: 1,
-            },
-          }
-        );
+            {
+              $set: { status: "available" },
+              $unset: {
+                lockedUntil: 1,
+                lockedBy: 1,
+              },
+            }
+          );
+        }
 
         res.status(409).json({
           success: false,
-          message:
-            "One or more seats were taken by another user",
+          message: "One or more seats were taken by another user. Please refresh and try again.",
         });
-
         return;
       }
 
       lockedSeats.push(lockedSeat);
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: `Seats locked for ${LOCK_DURATION_MINUTES} minutes`,
       lockedUntil,
       seats: lockedSeats,
     });
   } catch (error) {
-    console.error(
-      "Lock show seats error:",
-      error
-    );
+    console.error("Lock show seats error:", error);
 
     res.status(500).json({
       success: false,
@@ -383,7 +348,12 @@ export async function unlockShowSeats(
   res: Response
 ): Promise<void> {
   try {
-    if (!req.userId) {
+    const userIdValue = req.userId;
+
+    if (
+      !userIdValue ||
+      !mongoose.Types.ObjectId.isValid(userIdValue)
+    ) {
       res.status(401).json({
         success: false,
         message: "Authentication required",
@@ -391,9 +361,7 @@ export async function unlockShowSeats(
       return;
     }
 
-
-
-    const showId = String(req.params.showId);
+    const showId = String(req.params.showId ?? "");
     const { seatIds } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(showId)) {
@@ -404,48 +372,34 @@ export async function unlockShowSeats(
       return;
     }
 
-    if (!Array.isArray(seatIds) || seatIds.length === 0) {
+    if (
+      !Array.isArray(seatIds) ||
+      seatIds.length === 0 ||
+      seatIds.some(
+        (seatId: unknown) =>
+          typeof seatId !== "string" ||
+          !mongoose.Types.ObjectId.isValid(seatId)
+      )
+    ) {
       res.status(400).json({
         success: false,
-        message:
-          "seatIds must be a non-empty array",
+        message: "seatIds must be a non-empty array of valid seat IDs",
       });
       return;
     }
 
-    const uniqueSeatIds = [
-      ...new Set(seatIds.map(String)),
-    ];
-
-    for (const seatId of uniqueSeatIds) {
-      if (
-        !mongoose.Types.ObjectId.isValid(seatId)
-      ) {
-        res.status(400).json({
-          success: false,
-          message: `Invalid seat ID: ${seatId}`,
-        });
-        return;
-      }
-    }
-
-    const userId = new mongoose.Types.ObjectId(
-      req.userId
-    );
+    const uniqueSeatIds = [...new Set(seatIds as string[])];
+    const userId = new mongoose.Types.ObjectId(userIdValue);
 
     const result = await ShowSeat.updateMany(
       {
         show: showId,
-        seat: {
-          $in: uniqueSeatIds,
-        },
+        seat: { $in: uniqueSeatIds },
         status: "locked",
         lockedBy: userId,
       },
       {
-        $set: {
-          status: "available",
-        },
+        $set: { status: "available" },
         $unset: {
           lockedUntil: 1,
           lockedBy: 1,
@@ -453,16 +407,13 @@ export async function unlockShowSeats(
       }
     );
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: "Seats unlocked successfully",
       unlockedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error(
-      "Unlock show seats error:",
-      error
-    );
+    console.error("Unlock show seats error:", error);
 
     res.status(500).json({
       success: false,
