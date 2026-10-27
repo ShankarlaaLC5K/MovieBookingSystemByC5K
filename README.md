@@ -5,7 +5,7 @@ A full-stack movie ticket booking App built using the MERN stack, were users can
 
 // Netlify Link: https://ticketbookingsystembyc5k.netlify.app {Since used the trial version, unable to deploy the project after a certain limit. So found the alternate website the build}
 
-Vercel Link: https://movie-booking-system-smoky.vercel.app/
+Vercel Link: [https://movie-booking-system-smoky.vercel.app/](https://movie-booking-system-smoky.vercel.app/)
 ---------------------------------------------------------------------
 Updated the admin ID credentials
 Login - Admin |
